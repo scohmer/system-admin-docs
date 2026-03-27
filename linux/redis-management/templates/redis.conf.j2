@@ -1,0 +1,33 @@
+# Managed by Ansible
+
+bind {{ redis_bind }}
+port {{ redis_port }}
+protected-mode {{ 'no' if redis_bind != '127.0.0.1' else 'yes' }}
+
+{% if redis_password %}
+requirepass {{ redis_password }}
+{% endif %}
+
+# Memory
+maxmemory {{ redis_maxmemory }}
+maxmemory-policy {{ redis_maxmemory_policy }}
+
+# Persistence
+{% if redis_save_enabled %}
+{% for interval in redis_save_intervals %}
+save {{ interval }}
+{% endfor %}
+{% else %}
+save ""
+{% endif %}
+
+appendonly {{ 'yes' if redis_appendonly else 'no' }}
+
+# Logging
+loglevel {{ redis_loglevel }}
+logfile {{ redis_logfile }}
+
+# General
+databases {{ redis_databases }}
+daemonize no
+supervised systemd

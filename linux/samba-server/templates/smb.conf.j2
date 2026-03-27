@@ -1,0 +1,28 @@
+# /etc/samba/smb.conf — managed by Ansible (linux/samba-server)
+# Do not edit manually — changes will be overwritten.
+
+[global]
+   workgroup = {{ samba_workgroup }}
+   server string = {{ samba_server_string }}
+   security = user
+   map to guest = Bad User
+   dns proxy = no
+   log file = /var/log/samba/log.%m
+   max log size = 1000
+   logging = file
+   panic action = /usr/share/samba/panic-action %d
+
+{% for share in samba_shares %}
+[{{ share.name }}]
+   comment = {{ share.comment | default(share.name) }}
+   path = {{ share.path }}
+   browseable = {{ share.browseable | default('yes') }}
+   writable = {{ share.writable | default('yes') }}
+   guest ok = {{ share.guest_ok | default('no') }}
+{% if share.valid_users is defined %}
+   valid users = {{ share.valid_users }}
+{% endif %}
+   create mask = {{ share.create_mask | default('0664') }}
+   directory mask = {{ share.directory_mask | default('0775') }}
+
+{% endfor %}

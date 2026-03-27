@@ -1,0 +1,117 @@
+---
+# =============================================================================
+# Playbook: sudoers-management
+# Description: Manages sudo access via /etc/sudoers.d/ drop-in files.
+#              Validates each file with visudo -c before applying.
+#              Never modifies /etc/sudoers directly.
+# Collections: ansible.builtin
+# =============================================================================
+
+- name: Sudoers Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+
+    # -------------------------------------------------------------------------
+    # Ensure sudo is installed
+    # -------------------------------------------------------------------------
+
+    - name: Install sudo (Debian/Ubuntu)
+      ansible.builtin.apt:
+        name: sudo
+        state: present
+        update_cache: false
+      when: ansible_os_family == "Debian"
+
+    - name: Install sudo (RedHat/CentOS/Rocky)
+      ansible.builtin.dnf:
+        name: sudo
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    # -------------------------------------------------------------------------
+    # Ensure /etc/sudoers.d/ exists and is included
+    # -------------------------------------------------------------------------
+
+    - name: Ensure /etc/sudoers.d directory exists
+      ansible.builtin.file:
+        path: /etc/sudoers.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0750"
+
+    - name: Ensure sudoers includes /etc/sudoers.d/
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers
+        regexp: '^#includedir\s+/etc/sudoers\.d'
+        line: "#includedir /etc/sudoers.d"
+        validate: "visudo -c -f %s"
+        backup: true
+
+    # -------------------------------------------------------------------------
+    # Write per-user sudoers drop-in files
+    # -------------------------------------------------------------------------
+
+    - name: Write sudoers drop-in file for each user
+      ansible.builtin.copy:
+        dest: "/etc/sudoers.d/10-ansible-{{ item.username }}"
+        content: |
+          # Managed by Ansible - do not edit manually
+          {{ item.username }} ALL=(ALL:ALL) {{ 'NOPASSWD: ' if item.nopasswd | default(false) else '' }}{{ item.commands | default('ALL') }}
+        owner: root
+        group: root
+        mode: "0440"
+        validate: "visudo -c -f %s"
+      loop: "{{ sudo_users | default([]) }}"
+      loop_control:
+        label: "{{ item.username }}"
+
+    # -------------------------------------------------------------------------
+    # Write per-group sudoers drop-in files
+    # -------------------------------------------------------------------------
+
+    - name: Write sudoers drop-in file for each group
+      ansible.builtin.copy:
+        dest: "/etc/sudoers.d/10-ansible-group-{{ item.groupname }}"
+        content: |
+          # Managed by Ansible - do not edit manually
+          %{{ item.groupname }} ALL=(ALL:ALL) {{ 'NOPASSWD: ' if item.nopasswd | default(false) else '' }}{{ item.commands | default('ALL') }}
+        owner: root
+        group: root
+        mode: "0440"
+        validate: "visudo -c -f %s"
+      loop: "{{ sudo_groups | default([]) }}"
+      loop_control:
+        label: "{{ item.groupname }}"
+
+    # -------------------------------------------------------------------------
+    # Validate all Ansible-managed drop-in files
+    # -------------------------------------------------------------------------
+
+    - name: Validate all Ansible-managed sudoers drop-ins
+      ansible.builtin.command:
+        cmd: "visudo -c -f {{ item }}"
+      loop: "{{ query('fileglob', '/etc/sudoers.d/10-ansible-*') }}"
+      changed_when: false
+      when: sudoers_validate | default(true)
+
+    # -------------------------------------------------------------------------
+    # Report summary
+    # -------------------------------------------------------------------------
+
+    - name: List all drop-in files in /etc/sudoers.d/
+      ansible.builtin.find:
+        paths: /etc/sudoers.d
+        file_type: file
+      register: sudoers_drop_ins
+      changed_when: false
+
+    - name: Report sudoers drop-in files present
+      ansible.builtin.debug:
+        msg: "Sudoers drop-ins present: {{ sudoers_drop_ins.files | map(attribute='path') | list }}"

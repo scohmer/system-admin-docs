@@ -1,0 +1,12 @@
+---
+target_hosts: all
+
+system_locale: en_US.UTF-8
+system_language: en_US.UTF-8
+locale_keyboard: us
+
+# Locales to generate (Debian only — RHEL installs langpacks instead)
+locale_generate:
+  - "en_US.UTF-8 UTF-8"
+  # - "de_DE.UTF-8 UTF-8"
+  # - "fr_FR.UTF-8 UTF-8"

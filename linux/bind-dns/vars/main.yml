@@ -1,0 +1,37 @@
+---
+target_hosts: all
+
+bind_listen_on: "any"
+bind_allow_query: "localhost; 192.168.1.0/24"
+bind_allow_recursion: "localhost; 192.168.1.0/24"
+
+# Upstream forwarders (for recursive queries)
+bind_forwarders:
+  - "8.8.8.8"
+  - "8.8.4.4"
+
+bind_firewall_manage: true
+
+# Authoritative zones to serve
+bind_zones: []
+  # - name: corp.local
+  #   type: master
+  #   ttl: 3600
+  #   soa:
+  #     ns: ns1.corp.local.
+  #     email: hostmaster.corp.local.
+  #     serial: 2026032601
+  #     refresh: 3600
+  #     retry: 900
+  #     expire: 604800
+  #     minimum: 3600
+  #   records:
+  #     - name: "@"
+  #       type: NS
+  #       value: ns1.corp.local.
+  #     - name: ns1
+  #       type: A
+  #       value: 192.168.1.10
+  #     - name: appserver01
+  #       type: A
+  #       value: 192.168.1.100

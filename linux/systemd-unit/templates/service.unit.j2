@@ -1,0 +1,38 @@
+# /etc/systemd/system/{{ item.name }}.service
+# Managed by Ansible (linux/systemd-unit) — do not edit manually.
+
+[Unit]
+Description={{ item.description }}
+After={{ item.after | default(['network.target']) | join(' ') }}
+
+[Service]
+Type=simple
+{% if item.user is defined %}
+User={{ item.user }}
+{% endif %}
+{% if item.group is defined %}
+Group={{ item.group }}
+{% endif %}
+{% if item.working_dir is defined %}
+WorkingDirectory={{ item.working_dir }}
+{% endif %}
+ExecStart={{ item.exec_start }}
+{% if item.exec_stop is defined %}
+ExecStop={{ item.exec_stop }}
+{% endif %}
+Restart={{ item.restart | default('on-failure') }}
+RestartSec={{ item.restart_sec | default(5) }}
+
+{% if item.environment is defined %}
+{% for key, value in item.environment.items() %}
+Environment="{{ key }}={{ value }}"
+{% endfor %}
+{% endif %}
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy={{ item.wanted_by | default('multi-user.target') }}

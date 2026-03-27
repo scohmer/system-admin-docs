@@ -1,0 +1,16 @@
+---
+target_hosts: all
+
+# List of LUKS devices to configure
+luks_devices:
+  - device: /dev/sdb          # block device to encrypt
+    name: encrypted_data      # name for the mapped device (/dev/mapper/<name>)
+    passphrase: "changeme"    # use ansible-vault in production
+    filesystem: ext4          # filesystem to create on the mapped device
+    mount_point: /mnt/encrypted_data
+    mount_options: "defaults,noatime"
+    crypttab_options: "luks"
+    # Set to true only on first run to initialize (destructive!)
+    initialize: false
+
+luks_keyfile_dir: /etc/luks-keys

@@ -1,0 +1,20 @@
+---
+target_hosts: all
+
+# NFS exports to configure
+# path: directory to export (must exist or will be created)
+# clients: NFS client specification with options
+# owner/group/mode: directory ownership (optional)
+nfs_exports:
+  - path: /exports/data
+    clients: "192.168.1.0/24(rw,sync,no_subtree_check)"
+    owner: nobody
+    group: nogroup
+    mode: '0777'
+  # - path: /exports/readonly
+  #   clients: "*(ro,sync,no_subtree_check)"
+  # - path: /exports/admin
+  #   clients: "192.168.1.100(rw,sync,no_subtree_check,no_root_squash)"
+
+# Manage firewall rules for NFS
+nfs_firewall_manage: true

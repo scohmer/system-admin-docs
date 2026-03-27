@@ -1,0 +1,143 @@
+---
+# =============================================================================
+# Playbook: Ansible Controller Setup
+# Description: Configure the Ansible controller with cron-based playbook scheduling.
+# Run this playbook locally on the controller node.
+#
+# Usage:
+#   ansible-playbook -i localhost, -c local playbook.yml -e @vars/main.yml
+#
+# Variables: vars/main.yml
+# See README.md for full documentation and security notes.
+# =============================================================================
+
+- name: Configure Ansible Controller Automation
+  hosts: localhost
+  connection: local
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+
+    # ------------------------------------------------------------------
+    # Prerequisites
+    # ------------------------------------------------------------------
+    - name: Ensure Ansible is installed (Debian)
+      ansible.builtin.apt:
+        name:
+          - ansible
+          - python3-pip
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Ensure Ansible is installed (RHEL)
+      ansible.builtin.dnf:
+        name:
+          - ansible
+          - python3-pip
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Ensure log directory exists
+      ansible.builtin.file:
+        path: "{{ log_dir }}"
+        state: directory
+        owner: "{{ controller_user }}"
+        group: "{{ controller_user }}"
+        mode: '0750'
+
+    # ------------------------------------------------------------------
+    # Install the wrapper script
+    # ------------------------------------------------------------------
+    - name: Install run-playbook.sh wrapper to /usr/local/bin
+      ansible.builtin.copy:
+        src: run-playbook.sh
+        dest: /usr/local/bin/ansible-run-playbook.sh
+        owner: root
+        group: root
+        mode: '0755'
+
+    # ------------------------------------------------------------------
+    # Verify the repo path exists on the controller
+    # ------------------------------------------------------------------
+    - name: Check that repo_path exists
+      ansible.builtin.stat:
+        path: "{{ repo_path }}"
+      register: repo_stat
+
+    - name: Fail if repo_path does not exist
+      ansible.builtin.fail:
+        msg: >-
+          repo_path '{{ repo_path }}' does not exist on the controller.
+          Clone or copy the repository to this path before running this playbook.
+      when: not repo_stat.stat.exists
+
+    # ------------------------------------------------------------------
+    # Configure cron jobs for each scheduled playbook
+    # ------------------------------------------------------------------
+    - name: Create cron jobs for scheduled playbooks
+      ansible.builtin.cron:
+        name: "ansible: {{ item.name }}"
+        user: "{{ controller_user }}"
+        job: >-
+          /usr/local/bin/ansible-run-playbook.sh
+          "{{ repo_path }}/{{ item.playbook }}"
+          "{{ repo_path }}/{{ item.vars_file }}"
+          "{{ inventory_path }}"
+          "{{ log_dir }}"
+          "{{ item.extra_vars | to_json | replace('"', '\\"') }}"
+          "{{ item.limit | default('') }}"
+          >> "{{ log_dir }}/cron_{{ item.name | replace(' ', '_') }}.log" 2>&1
+        minute: "{{ item.minute | default('0') }}"
+        hour: "{{ item.hour | default('0') }}"
+        day: "{{ item.day | default('*') }}"
+        month: "{{ item.month | default('*') }}"
+        weekday: "{{ item.weekday | default('*') }}"
+        state: "{{ 'present' if item.enabled | default(true) else 'absent' }}"
+        disabled: "{{ not (item.enabled | default(true)) }}"
+      loop: "{{ scheduled_playbooks | default([]) }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    # ------------------------------------------------------------------
+    # Configure logrotate for Ansible logs
+    # ------------------------------------------------------------------
+    - name: Configure logrotate for Ansible controller logs
+      ansible.builtin.copy:
+        content: |
+          # Ansible-managed: logrotate for Ansible controller run logs
+          {{ log_dir }}/*.log {
+              daily
+              rotate 30
+              compress
+              delaycompress
+              missingok
+              notifempty
+              create 0640 {{ controller_user }} {{ controller_user }}
+          }
+        dest: /etc/logrotate.d/ansible-controller
+        owner: root
+        group: root
+        mode: '0644'
+
+    # ------------------------------------------------------------------
+    # Display summary
+    # ------------------------------------------------------------------
+    - name: Display configured cron schedule
+      ansible.builtin.command: "crontab -u {{ controller_user }} -l"
+      register: crontab_output
+      changed_when: false
+      failed_when: false
+
+    - name: Show scheduled playbook cron jobs
+      ansible.builtin.debug:
+        msg:
+          - "=== Ansible Controller Cron Schedule for user: {{ controller_user }} ==="
+          - "{{ crontab_output.stdout_lines | default(['(no cron jobs)']) }}"
+          - ""
+          - "Logs will be written to: {{ log_dir }}/"
+          - "Wrapper script: /usr/local/bin/ansible-run-playbook.sh"

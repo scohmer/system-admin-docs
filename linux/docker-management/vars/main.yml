@@ -1,0 +1,28 @@
+---
+target_hosts: all
+
+# Install Docker Compose v2 plugin alongside Docker Engine
+docker_install_compose: true
+
+# Linux users to add to the 'docker' group (grants Docker socket access)
+docker_users: []
+  # - myusername
+
+# Docker daemon configuration (/etc/docker/daemon.json)
+docker_daemon_config:
+  log-driver: "json-file"
+  log-opts:
+    max-size: "100m"
+    max-file: "3"
+  # storage-driver: overlay2
+  # dns:
+  #   - 8.8.8.8
+  #   - 8.8.4.4
+  # live-restore: true
+
+# Docker Compose projects to deploy
+docker_compose_projects: []
+  # - dir: /opt/myapp
+  #   compose_src: files/myapp/docker-compose.yml
+  #   owner: ubuntu
+  #   group: ubuntu

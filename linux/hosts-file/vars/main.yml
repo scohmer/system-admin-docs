@@ -1,0 +1,28 @@
+---
+target_hosts: all
+
+hosts_preserve_existing: true
+
+# Host entries to add or update in /etc/hosts
+# ip: IP address
+# hostname: primary hostname (FQDN recommended)
+# aliases: optional list of additional names
+hosts_entries:
+  - ip: "192.168.1.100"
+    hostname: "appserver01.corp.local"
+    aliases:
+      - appserver01
+      - app
+  - ip: "192.168.1.200"
+    hostname: "dbserver01.corp.local"
+    aliases:
+      - dbserver01
+  # - ip: "10.0.0.1"
+  #   hostname: "gateway.corp.local"
+  #   aliases:
+  #     - gateway
+  #     - gw
+
+# Hostnames to remove from /etc/hosts
+hosts_entries_remove: []
+  # - oldserver.corp.local

@@ -1,0 +1,31 @@
+# Managed by Ansible
+
+@@define DBDIR /var/lib/aide
+@@define LOGDIR /var/log/aide
+
+database=file:@@{DBDIR}/aide.db
+database_out=file:@@{DBDIR}/aide.db.new
+gzip_dbout=yes
+
+report_url=file:{{ aide_report_path }}
+report_url=stdout
+
+# Default rules
+All = p+i+n+u+g+s+m+S+sha256+acl+xattrs
+Norm = p+i+n+u+g+s+m+sha256
+
+/boot    All
+/bin     Norm
+/sbin    Norm
+/lib     Norm
+/lib64   Norm
+/usr     Norm
+/root    Norm
+/etc     Norm
+{% for dir in aide_extra_include %}
+{{ dir }}  Norm
+{% endfor %}
+
+{% for dir in aide_extra_exclude %}
+!/{{ dir | regex_replace('^/', '') }}
+{% endfor %}

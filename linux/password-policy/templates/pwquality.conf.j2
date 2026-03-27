@@ -1,0 +1,18 @@
+# /etc/security/pwquality.conf — managed by Ansible (linux/password-policy)
+# Password quality requirements
+
+minlen = {{ password_min_length }}
+minclass = {{ password_min_class }}
+ucredit = -{{ password_min_upper }}
+lcredit = -{{ password_min_lower }}
+dcredit = -{{ password_min_digit }}
+ocredit = -{{ password_min_special }}
+
+# Reject passwords that are too similar to previous password
+difok = 3
+
+# Reject passwords that contain the username
+usercheck = 1
+
+# Number of retries before PAM returns error
+retry = 3

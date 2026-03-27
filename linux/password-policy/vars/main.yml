@@ -1,0 +1,18 @@
+---
+target_hosts: all
+
+# Password aging (login.defs)
+password_max_age: 90      # Max days before password must change
+password_min_age: 1       # Min days between changes (prevent immediate re-use)
+password_warn_age: 14     # Days before expiry to warn user
+password_min_length: 12   # Minimum password length
+
+# Password history
+password_remember: 5      # Number of previous passwords to reject
+
+# Complexity (pwquality.conf)
+password_min_class: 3     # Min number of character classes required
+password_min_upper: 1     # Min uppercase letters
+password_min_lower: 1     # Min lowercase letters
+password_min_digit: 1     # Min digit characters
+password_min_special: 1   # Min special characters

@@ -1,0 +1,81 @@
+---
+- name: NFS Server Configuration
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Install NFS server packages (Debian)
+      ansible.builtin.apt:
+        name: nfs-kernel-server
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install NFS server packages (RedHat)
+      ansible.builtin.dnf:
+        name: nfs-utils
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Ensure export directories exist
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ item.owner | default('root') }}"
+        group: "{{ item.group | default('root') }}"
+        mode: "{{ item.mode | default('0755') }}"
+      loop: "{{ nfs_exports }}"
+
+    - name: Configure /etc/exports
+      ansible.builtin.template:
+        src: exports.j2
+        dest: /etc/exports
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      notify: Re-export NFS shares
+
+    - name: Enable and start NFS server (Debian)
+      ansible.builtin.systemd:
+        name: nfs-kernel-server
+        enabled: true
+        state: started
+      when: ansible_os_family == "Debian"
+
+    - name: Enable and start NFS server (RedHat)
+      ansible.builtin.systemd:
+        name: nfs-server
+        enabled: true
+        state: started
+      when: ansible_os_family == "RedHat"
+
+    - name: Open NFS ports in firewalld (RedHat)
+      ansible.posix.firewalld:
+        service: nfs
+        permanent: true
+        state: enabled
+        immediate: true
+      when:
+        - ansible_os_family == "RedHat"
+        - nfs_firewall_manage | bool
+
+    - name: Open NFS ports in UFW (Debian)
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - "2049"
+        - "111"
+      when:
+        - ansible_os_family == "Debian"
+        - nfs_firewall_manage | bool
+
+  handlers:
+    - name: Re-export NFS shares
+      ansible.builtin.command: exportfs -ra
+      changed_when: true

@@ -1,0 +1,32 @@
+---
+target_hosts: all
+
+apache_remove_default: true
+apache_firewall_manage: true
+
+# Modules to enable (Debian a2enmod)
+apache_modules_enable:
+  - rewrite
+  - ssl
+  - headers
+
+# Modules to disable
+apache_modules_disable: []
+  # - autoindex
+
+# Virtual hosts
+apache_vhosts:
+  - name: myapp
+    server_name: myapp.example.com
+    document_root: /var/www/myapp
+    listen_port: 80
+    ssl_enabled: false
+    # ssl_cert: /etc/ssl/certs/custom/myapp.crt
+    # ssl_key: /etc/ssl/certs/custom/myapp.key
+  # - name: api
+  #   server_name: api.example.com
+  #   listen_port: 443
+  #   ssl_enabled: true
+  #   ssl_cert: /etc/ssl/certs/custom/api.crt
+  #   ssl_key: /etc/ssl/certs/custom/api.key
+  #   proxy_pass: http://127.0.0.1:8080

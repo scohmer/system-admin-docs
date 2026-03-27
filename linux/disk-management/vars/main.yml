@@ -1,0 +1,26 @@
+---
+# =============================================================================
+# Disk Management Variables
+# Populate these variables before running the playbook.
+# See README.md for full documentation of each variable.
+# =============================================================================
+
+# Target hosts or group from your Ansible inventory
+target_hosts: all
+
+# Disk usage warning thresholds (percent)
+disk_warning_threshold_pct: 80
+disk_critical_threshold_pct: 90
+
+# LVM volumes to create or manage
+# Leave empty to only run disk usage reporting
+lvm_volumes: []
+# Example:
+# lvm_volumes:
+#   - vg: data_vg
+#     lv: app_lv
+#     size: 20g
+#     filesystem: ext4
+#     mount_point: /data/app
+#     mount_opts: defaults
+#     state: present

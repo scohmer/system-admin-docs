@@ -1,0 +1,33 @@
+---
+# =============================================================================
+# Log Management Variables
+# Populate these variables before running the playbook.
+# See README.md for full documentation of each variable.
+# =============================================================================
+
+# Target hosts or group from your Ansible inventory
+target_hosts: all
+
+# Remote syslog forwarding
+rsyslog_forward_enabled: false
+# rsyslog_remote_host: syslog.example.com
+rsyslog_remote_port: 514
+rsyslog_remote_protocol: udp    # tcp or udp
+
+# Custom logrotate configurations
+logrotate_configs: []
+# Example:
+# logrotate_configs:
+#   - name: nginx
+#     path: /var/log/nginx/*.log
+#     frequency: daily
+#     rotate: 14
+#     compress: true
+#     delaycompress: true
+#     missingok: true
+#     notifempty: true
+#     create: "0640 www-data adm"
+#     postrotate: |
+#       if [ -f /var/run/nginx.pid ]; then
+#         kill -USR1 $(cat /var/run/nginx.pid)
+#       fi

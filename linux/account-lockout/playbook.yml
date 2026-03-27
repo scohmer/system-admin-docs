@@ -1,0 +1,61 @@
+---
+- name: Account Lockout Policy (pam_faillock)
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    # ── Configure faillock.conf (modern approach) ────────────────────────────
+    - name: Configure /etc/security/faillock.conf
+      ansible.builtin.template:
+        src: faillock.conf.j2
+        dest: /etc/security/faillock.conf
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+
+    # ── Configure PAM for pam_faillock (Debian/Ubuntu) ──────────────────────
+    - name: Configure PAM auth with pam_faillock (Debian)
+      ansible.builtin.blockinfile:
+        path: /etc/pam.d/common-auth
+        marker: "# {mark} ANSIBLE MANAGED - faillock"
+        insertbefore: '^auth.*pam_unix.so'
+        block: |
+          auth    required                        pam_faillock.so preauth
+      when: ansible_os_family == "Debian"
+
+    - name: Configure PAM auth pam_faillock authfail (Debian)
+      ansible.builtin.lineinfile:
+        path: /etc/pam.d/common-auth
+        regexp: 'pam_faillock.so authfail'
+        line: "auth    [default=die]                   pam_faillock.so authfail"
+        insertafter: '^auth.*pam_unix.so'
+        backup: true
+      when: ansible_os_family == "Debian"
+
+    # ── Configure PAM for pam_faillock (RedHat) ─────────────────────────────
+    - name: Configure PAM system-auth with pam_faillock (RedHat)
+      ansible.builtin.command: >
+        authconfig
+        --enablefaillock
+        --faillockargs="deny={{ faillock_deny }} unlock_time={{ faillock_unlock_time }}"
+        --update
+      when:
+        - ansible_os_family == "RedHat"
+        - ansible_distribution_major_version | int < 8
+      changed_when: true
+
+    - name: Configure PAM with authselect (RHEL 8+)
+      ansible.builtin.command: authselect select sssd with-faillock --force
+      when:
+        - ansible_os_family == "RedHat"
+        - ansible_distribution_major_version | int >= 8
+      changed_when: true
+
+  handlers:
+    - name: Restart PAM
+      ansible.builtin.debug:
+        msg: "PAM changes take effect immediately for new sessions."

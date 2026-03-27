@@ -1,0 +1,83 @@
+---
+- name: MOTD and Login Banner Configuration
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Deploy SSH pre-login banner (/etc/issue.net)
+      ansible.builtin.copy:
+        content: "{{ ssh_banner_content }}"
+        dest: /etc/issue.net
+        owner: root
+        group: root
+        mode: '0644'
+      when: ssh_banner_enabled | bool
+
+    - name: Configure SSH to use banner
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?Banner'
+        line: "Banner /etc/issue.net"
+        state: present
+        backup: true
+      when: ssh_banner_enabled | bool
+      notify: Reload SSH
+
+    - name: Disable default MOTD scripts (Debian)
+      ansible.builtin.find:
+        paths: /etc/update-motd.d
+        patterns: "*"
+        file_type: file
+      register: motd_scripts
+      when:
+        - ansible_os_family == "Debian"
+        - motd_disable_default | bool
+
+    - name: Remove execute bit from default MOTD scripts
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        mode: '0644'
+      loop: "{{ motd_scripts.files | default([]) }}"
+      when:
+        - ansible_os_family == "Debian"
+        - motd_disable_default | bool
+
+    - name: Deploy static /etc/motd
+      ansible.builtin.copy:
+        content: "{{ motd_content }}"
+        dest: /etc/motd
+        owner: root
+        group: root
+        mode: '0644'
+      when: not motd_dynamic | bool
+
+    - name: Deploy dynamic MOTD script
+      ansible.builtin.template:
+        src: dynamic-motd.sh.j2
+        dest: /etc/update-motd.d/99-ansible-motd
+        owner: root
+        group: root
+        mode: '0755'
+      when:
+        - motd_dynamic | bool
+        - ansible_os_family == "Debian"
+
+    - name: Deploy dynamic MOTD for non-Debian (via /etc/profile.d)
+      ansible.builtin.template:
+        src: dynamic-motd.sh.j2
+        dest: /etc/profile.d/motd.sh
+        owner: root
+        group: root
+        mode: '0755'
+      when:
+        - motd_dynamic | bool
+        - ansible_os_family != "Debian"
+
+  handlers:
+    - name: Reload SSH
+      ansible.builtin.systemd:
+        name: sshd
+        state: reloaded

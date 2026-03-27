@@ -1,0 +1,17 @@
+---
+target_hosts: all
+
+auditd_log_file: /var/log/audit/audit.log
+auditd_max_log_file: 50          # MB
+auditd_max_log_file_action: ROTATE
+auditd_num_logs: 5
+auditd_space_left_action: SYSLOG
+auditd_admin_space_left_action: HALT
+
+# Enable CIS Benchmark baseline audit rules
+auditd_use_cis_rules: true
+
+# Custom audit rules (appended after CIS rules)
+auditd_rules: []
+  # - "-w /etc/myapp -p wa -k myapp_config"
+  # - "-a always,exit -F arch=b64 -S open -F dir=/data -k data_access"

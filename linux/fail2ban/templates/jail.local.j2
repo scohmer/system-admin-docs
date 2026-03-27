@@ -1,0 +1,12 @@
+# /etc/fail2ban/jail.local — managed by Ansible (linux/fail2ban)
+# Global defaults — do not edit manually.
+
+[DEFAULT]
+bantime  = {{ fail2ban_bantime }}
+findtime = {{ fail2ban_findtime }}
+maxretry = {{ fail2ban_maxretry }}
+ignoreip = {{ fail2ban_ignoreips | join(' ') }}
+{% if fail2ban_email %}
+destemail = {{ fail2ban_email }}
+action = %(action_mwl)s
+{% endif %}

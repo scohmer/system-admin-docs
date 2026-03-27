@@ -1,0 +1,26 @@
+# /etc/chrony.conf — managed by Ansible (linux/chrony-ntp)
+# Do not edit manually — changes will be overwritten.
+
+{% for server in ntp_servers %}
+pool {{ server }}
+{% endfor %}
+
+# Allow the system clock to be stepped in the first three updates
+# if its offset is larger than 1 second.
+makestep {{ chrony_makestep }}
+
+{% if chrony_rtcsync %}
+# Enable kernel synchronization of the real-time clock (RTC).
+rtcsync
+{% endif %}
+
+{% if chrony_allow_clients | length > 0 %}
+# Allow NTP client access from these subnets
+{% for client in chrony_allow_clients %}
+allow {{ client }}
+{% endfor %}
+{% endif %}
+
+# Log tracking and statistics
+logdir /var/log/chrony
+log tracking measurements statistics

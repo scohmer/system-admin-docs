@@ -1,0 +1,22 @@
+---
+# =============================================================================
+# System Patching Variables
+# Populate these variables before running the playbook.
+# See README.md for full documentation and patching strategy recommendations.
+# =============================================================================
+
+# Target hosts or group from your Ansible inventory
+target_hosts: all
+
+# What to update: "security" (security updates only) or "all" (all updates)
+update_type: security
+
+# Automatically reboot if required after patching
+# Set to false for production — schedule reboots in a maintenance window
+reboot_if_required: false
+
+# Seconds to wait for host to come back online after reboot
+reboot_timeout: 300
+
+# Log a completion marker to syslog after patching finishes
+notify_on_complete: true

@@ -1,0 +1,145 @@
+---
+# =============================================================================
+# Playbook: System Patching
+# Description: Apply security or all OS updates. Handles reboot detection.
+# Variables:   vars/main.yml
+# See README.md for variable documentation, usage, and patching strategy.
+# =============================================================================
+
+- name: Linux System Patching
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+
+    # ------------------------------------------------------------------
+    # Record pre-patch state
+    # ------------------------------------------------------------------
+    - name: Record kernel version before patching
+      ansible.builtin.command: uname -r
+      register: kernel_before
+      changed_when: false
+
+    - name: Display pre-patch kernel version
+      ansible.builtin.debug:
+        msg: "Pre-patch kernel: {{ kernel_before.stdout }}"
+
+    # ------------------------------------------------------------------
+    # Debian / Ubuntu patching (apt)
+    # ------------------------------------------------------------------
+    - name: "[apt] Update package cache"
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 0    # Always refresh during patching
+      when: ansible_os_family == "Debian"
+
+    - name: "[apt] Apply security updates only"
+      ansible.builtin.apt:
+        upgrade: dist
+        default_release: "{{ ansible_distribution_release }}-security"
+      when:
+        - ansible_os_family == "Debian"
+        - update_type == "security"
+      ignore_errors: true   # Not all distros have a -security pocket; fall through to next task
+
+    - name: "[apt] Apply all updates"
+      ansible.builtin.apt:
+        upgrade: dist
+      when:
+        - ansible_os_family == "Debian"
+        - update_type == "all"
+
+    # ------------------------------------------------------------------
+    # RHEL / CentOS / Rocky / Alma patching (dnf)
+    # ------------------------------------------------------------------
+    - name: "[dnf] Apply security updates only"
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+        security: true
+      when:
+        - ansible_os_family == "RedHat"
+        - update_type == "security"
+
+    - name: "[dnf] Apply all updates"
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+      when:
+        - ansible_os_family == "RedHat"
+        - update_type == "all"
+
+    # ------------------------------------------------------------------
+    # Detect reboot requirement
+    # ------------------------------------------------------------------
+    - name: "[Debian] Check if reboot is required"
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_required_debian
+      when: ansible_os_family == "Debian"
+
+    - name: "[RHEL] Check if reboot is required"
+      ansible.builtin.command: needs-restarting -r
+      register: reboot_required_rhel
+      changed_when: false
+      failed_when: false
+      when: ansible_os_family == "RedHat"
+
+    - name: Set reboot_needed fact (Debian)
+      ansible.builtin.set_fact:
+        reboot_needed: "{{ reboot_required_debian.stat.exists | default(false) }}"
+      when: ansible_os_family == "Debian"
+
+    - name: Set reboot_needed fact (RHEL)
+      ansible.builtin.set_fact:
+        reboot_needed: "{{ reboot_required_rhel.rc == 1 | default(false) }}"
+      when: ansible_os_family == "RedHat"
+
+    # ------------------------------------------------------------------
+    # Reboot if needed and allowed
+    # ------------------------------------------------------------------
+    - name: Reboot if required and reboot_if_required is true
+      ansible.builtin.reboot:
+        reboot_timeout: "{{ reboot_timeout | default(300) }}"
+        msg: "Ansible-initiated reboot after system patching"
+      when:
+        - reboot_needed | default(false)
+        - reboot_if_required | default(false)
+
+    - name: Warn if reboot needed but not allowed
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: {{ inventory_hostname }} requires a reboot to complete patching,
+          but reboot_if_required is false. Schedule a reboot during a maintenance window.
+      when:
+        - reboot_needed | default(false)
+        - not (reboot_if_required | default(false))
+
+    # ------------------------------------------------------------------
+    # Post-patch reporting
+    # ------------------------------------------------------------------
+    - name: Record kernel version after patching
+      ansible.builtin.command: uname -r
+      register: kernel_after
+      changed_when: false
+
+    - name: Display patching summary
+      ansible.builtin.debug:
+        msg:
+          - "Host:            {{ inventory_hostname }}"
+          - "OS:              {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "Update type:     {{ update_type }}"
+          - "Kernel before:   {{ kernel_before.stdout }}"
+          - "Kernel after:    {{ kernel_after.stdout }}"
+          - "Reboot needed:   {{ reboot_needed | default(false) }}"
+          - "Rebooted:        {{ reboot_if_required | default(false) and (reboot_needed | default(false)) }}"
+
+    - name: Log completion to syslog
+      ansible.builtin.command:
+        cmd: "logger -t ansible-patching 'System patching complete on {{ inventory_hostname }}. Update type: {{ update_type }}'"
+      changed_when: false
+      when: notify_on_complete | default(false)

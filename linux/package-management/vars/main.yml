@@ -1,0 +1,32 @@
+---
+# =============================================================================
+# Package Management Variables
+# Populate these variables before running the playbook.
+# See README.md for full documentation of each variable.
+# =============================================================================
+
+# Target hosts or group from your Ansible inventory
+target_hosts: all
+
+# Packages to install
+packages_to_install:
+  - curl
+  - vim
+  - htop
+  # Add more packages here
+
+# Packages to remove
+packages_to_remove: []
+# Example:
+# packages_to_remove:
+#   - telnet
+#   - rsh
+
+# Refresh package cache before running (recommended: true)
+update_cache: true
+
+# Upgrade all installed packages (use with caution on production)
+upgrade_all: false
+
+# Remove unused dependencies after install/remove
+autoremove: false

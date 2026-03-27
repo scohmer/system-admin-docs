@@ -1,0 +1,6 @@
+# /etc/audit/rules.d/50-custom.rules — managed by Ansible (linux/auditd)
+# Custom audit rules from vars/main.yml
+
+{% for rule in auditd_rules %}
+{{ rule }}
+{% endfor %}

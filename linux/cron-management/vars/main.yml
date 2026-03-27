@@ -1,0 +1,38 @@
+---
+# =============================================================================
+# Cron Job Management Variables
+# Populate these variables before running the playbook.
+# See README.md for full documentation of each variable.
+# =============================================================================
+
+# Target hosts or group from your Ansible inventory
+target_hosts: all
+
+# Cron jobs to manage
+cron_jobs: []
+# Examples:
+# cron_jobs:
+#   # Run a backup script daily at 2:00 AM
+#   - name: "Daily backup"
+#     user: root
+#     job: "/usr/local/bin/backup.sh >> /var/log/backup.log 2>&1"
+#     minute: "0"
+#     hour: "2"
+#     day: "*"
+#     month: "*"
+#     weekday: "*"
+#     state: present
+#
+#   # Check disk usage every 15 minutes
+#   - name: "Disk usage check"
+#     user: root
+#     job: "df -h >> /var/log/disk_check.log 2>&1"
+#     minute: "*/15"
+#     hour: "*"
+#     state: present
+#
+#   # Remove an old job
+#   - name: "Old cleanup script"
+#     user: root
+#     job: "/usr/local/bin/old-cleanup.sh"
+#     state: absent

@@ -1,0 +1,86 @@
+---
+- name: Redis Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Install redis (Debian)
+      ansible.builtin.apt:
+        name: redis-server
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install redis (RedHat)
+      ansible.builtin.dnf:
+        name: redis
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Set OS-specific Redis config path (Debian)
+      ansible.builtin.set_fact:
+        redis_conf_file: /etc/redis/redis.conf
+        redis_service_name: redis-server
+      when: ansible_os_family == "Debian"
+
+    - name: Set OS-specific Redis config path (RedHat)
+      ansible.builtin.set_fact:
+        redis_conf_file: /etc/redis.conf
+        redis_service_name: redis
+      when: ansible_os_family == "RedHat"
+
+    - name: Deploy redis.conf from template
+      ansible.builtin.template:
+        src: redis.conf.j2
+        dest: "{{ redis_conf_file }}"
+        owner: root
+        group: redis
+        mode: '0640'
+        backup: true
+      notify: Restart Redis
+
+    - name: Enable and start Redis service
+      ansible.builtin.systemd:
+        name: "{{ redis_service_name }}"
+        enabled: true
+        state: started
+
+    - name: Verify Redis is responding
+      ansible.builtin.command: redis-cli ping
+      register: redis_ping_result
+      changed_when: false
+      failed_when: redis_ping_result.stdout != 'PONG'
+
+    - name: Display Redis status
+      ansible.builtin.debug:
+        msg: "Redis is running and responding to PING"
+
+    - name: Open Redis port in firewalld (RedHat)
+      ansible.posix.firewalld:
+        port: "{{ redis_port }}/tcp"
+        permanent: true
+        state: enabled
+        immediate: true
+      when:
+        - ansible_os_family == "RedHat"
+        - redis_firewall_manage | bool
+        - redis_bind != '127.0.0.1'
+
+    - name: Open Redis port in UFW (Debian)
+      community.general.ufw:
+        rule: allow
+        port: "{{ redis_port }}"
+        proto: tcp
+      when:
+        - ansible_os_family == "Debian"
+        - redis_firewall_manage | bool
+        - redis_bind != '127.0.0.1'
+
+  handlers:
+    - name: Restart Redis
+      ansible.builtin.systemd:
+        name: "{{ redis_service_name }}"
+        state: restarted

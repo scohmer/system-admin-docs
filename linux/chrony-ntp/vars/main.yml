@@ -1,0 +1,22 @@
+---
+target_hosts: all
+
+# NTP servers to sync with
+ntp_servers:
+  - 0.pool.ntp.org iburst
+  - 1.pool.ntp.org iburst
+  - 2.pool.ntp.org iburst
+  - 3.pool.ntp.org iburst
+  # For an internal NTP server:
+  # - ntp.corp.local iburst prefer
+
+# Subnets allowed to query this host as NTP server (empty = client only)
+chrony_allow_clients: []
+  # - 192.168.1.0/24
+  # - 10.0.0.0/8
+
+# Allow stepping the clock for the first N corrections (startup)
+chrony_makestep: "1 3"
+
+# Keep hardware RTC in sync with system clock
+chrony_rtcsync: true

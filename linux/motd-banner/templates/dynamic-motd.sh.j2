@@ -1,0 +1,22 @@
+#!/bin/bash
+# Dynamic MOTD — managed by Ansible (linux/motd-banner)
+HOSTNAME=$(hostname -f)
+UPTIME=$(uptime -p)
+LOAD=$(cut -d' ' -f1-3 /proc/loadavg)
+MEMORY=$(free -h | awk '/^Mem:/ {printf "%s used / %s total", $3, $2}')
+DISK=$(df -h / | awk 'NR==2 {printf "%s used / %s total (%s)", $3, $2, $5}')
+USERS=$(who | wc -l)
+IP=$(hostname -I | awk '{print $1}')
+
+echo ""
+echo "  ╔══════════════════════════════════════════════════╗"
+printf  "  ║  %-49s║\n" "$HOSTNAME"
+echo "  ╠══════════════════════════════════════════════════╣"
+printf  "  ║  %-18s %-30s║\n" "IP Address:"   "$IP"
+printf  "  ║  %-18s %-30s║\n" "Uptime:"       "$UPTIME"
+printf  "  ║  %-18s %-30s║\n" "Load Average:" "$LOAD"
+printf  "  ║  %-18s %-30s║\n" "Memory:"       "$MEMORY"
+printf  "  ║  %-18s %-30s║\n" "Disk (/):"     "$DISK"
+printf  "  ║  %-18s %-30s║\n" "Logged In:"    "$USERS user(s)"
+echo "  ╚══════════════════════════════════════════════════╝"
+echo ""

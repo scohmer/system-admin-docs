@@ -1,0 +1,46 @@
+---
+# =============================================================================
+# Firewall Management Variables
+# Populate these variables before running the playbook.
+# See README.md for full documentation of each variable.
+# WARNING: Always include SSH (port 22) to avoid locking yourself out.
+# =============================================================================
+
+# Target hosts or group from your Ansible inventory
+target_hosts: all
+
+# Default zone for firewalld rules
+firewalld_default_zone: public
+
+# Reset all rules before applying (DESTRUCTIVE — use with extreme caution)
+firewall_flush_rules: false
+
+# Firewall rules to apply
+firewall_rules:
+  - port: 22
+    protocol: tcp
+    state: enabled
+    comment: "SSH"
+
+  - port: 80
+    protocol: tcp
+    state: enabled
+    comment: "HTTP"
+
+  - port: 443
+    protocol: tcp
+    state: enabled
+    comment: "HTTPS"
+
+  # Example: restrict a port to a specific source IP range
+  # - port: 8080
+  #   protocol: tcp
+  #   state: enabled
+  #   source: "10.0.0.0/8"
+  #   comment: "Internal app port"
+
+  # Example: disable a port
+  # - port: 23
+  #   protocol: tcp
+  #   state: disabled
+  #   comment: "Block Telnet"

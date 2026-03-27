@@ -1,0 +1,74 @@
+---
+- name: LVM Snapshot Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Install LVM tools
+      ansible.builtin.package:
+        name: lvm2
+        state: present
+
+    # ── List LVM snapshots ──────────────────────────────────────────────────
+    - name: List all LVM snapshots
+      ansible.builtin.command: lvs -o lv_name,vg_name,origin,lv_size,data_percent,lv_attr --noheadings
+      register: lvm_list
+      changed_when: false
+      when: lvm_snapshot_action == 'list'
+
+    - name: Display LVM volumes (filter snapshots)
+      ansible.builtin.debug:
+        msg: "{{ lvm_list.stdout_lines | select('match', '.*s.*') | list }}"
+      when: lvm_snapshot_action == 'list'
+
+    # ── Create LVM snapshots ────────────────────────────────────────────────
+    - name: Create LVM snapshots
+      community.general.lvol:
+        vg: "{{ item.origin_lv | regex_replace('^/dev/([^/]+)/.*', '\\1') }}"
+        lv: "{{ item.snapshot_name }}"
+        snapshot: "{{ item.origin_lv | regex_replace('^/dev/[^/]+/(.*)', '\\1') }}"
+        size: "{{ item.size }}"
+        state: present
+      loop: "{{ lvm_snapshots }}"
+      when:
+        - lvm_snapshot_action == 'create'
+        - lvm_snapshots | length > 0
+
+    - name: Mount snapshots if mount_point specified
+      ansible.posix.mount:
+        src: "/dev/{{ item.origin_lv | regex_replace('^/dev/([^/]+)/.*', '\\1') }}/{{ item.snapshot_name }}"
+        path: "{{ item.mount_point }}"
+        fstype: "{{ item.fstype | default('ext4') }}"
+        opts: "ro,noatime"
+        state: mounted
+      loop: "{{ lvm_snapshots }}"
+      when:
+        - lvm_snapshot_action == 'create'
+        - lvm_snapshots | length > 0
+        - item.mount_point is defined
+
+    # ── Remove LVM snapshots ────────────────────────────────────────────────
+    - name: Unmount snapshots before removal
+      ansible.posix.mount:
+        path: "{{ item.mount_point }}"
+        state: unmounted
+      loop: "{{ lvm_snapshots }}"
+      when:
+        - lvm_snapshot_action == 'remove'
+        - lvm_snapshots | length > 0
+        - item.mount_point is defined
+      ignore_errors: true
+
+    - name: Remove LVM snapshots
+      community.general.lvol:
+        vg: "{{ item.origin_lv | regex_replace('^/dev/([^/]+)/.*', '\\1') }}"
+        lv: "{{ item.snapshot_name }}"
+        state: absent
+        force: true
+      loop: "{{ lvm_snapshots }}"
+      when:
+        - lvm_snapshot_action == 'remove'
+        - lvm_snapshots | length > 0

@@ -1,0 +1,95 @@
+---
+- name: BIND DNS Server Configuration
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  vars:
+    bind_service: "{{ 'bind9' if ansible_os_family == 'Debian' else 'named' }}"
+    bind_confdir: "{{ '/etc/bind' if ansible_os_family == 'Debian' else '/etc' }}"
+    bind_zonedir: "{{ '/etc/bind/zones' if ansible_os_family == 'Debian' else '/var/named' }}"
+
+  tasks:
+    - name: Install BIND9 (Debian)
+      ansible.builtin.apt:
+        name:
+          - bind9
+          - bind9utils
+          - bind9-doc
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install BIND9 (RedHat)
+      ansible.builtin.dnf:
+        name:
+          - bind
+          - bind-utils
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Create zone files directory
+      ansible.builtin.file:
+        path: "{{ bind_zonedir }}"
+        state: directory
+        owner: "{{ 'bind' if ansible_os_family == 'Debian' else 'named' }}"
+        group: "{{ 'bind' if ansible_os_family == 'Debian' else 'named' }}"
+        mode: '0750'
+
+    - name: Deploy named.conf
+      ansible.builtin.template:
+        src: named.conf.j2
+        dest: "{{ bind_confdir }}/named.conf.local"
+        owner: root
+        group: "{{ 'bind' if ansible_os_family == 'Debian' else 'named' }}"
+        mode: '0640'
+        backup: true
+        validate: 'named-checkconf %s'
+      notify: Reload BIND
+
+    - name: Deploy zone files
+      ansible.builtin.template:
+        src: zone.j2
+        dest: "{{ bind_zonedir }}/db.{{ item.name }}"
+        owner: root
+        group: "{{ 'bind' if ansible_os_family == 'Debian' else 'named' }}"
+        mode: '0640'
+      loop: "{{ bind_zones }}"
+      when: bind_zones | length > 0
+      notify: Reload BIND
+
+    - name: Enable and start BIND
+      ansible.builtin.systemd:
+        name: "{{ bind_service }}"
+        enabled: true
+        state: started
+
+    - name: Open DNS port in firewalld (RedHat)
+      ansible.posix.firewalld:
+        service: dns
+        permanent: true
+        state: enabled
+        immediate: true
+      when:
+        - ansible_os_family == "RedHat"
+        - bind_firewall_manage | bool
+
+    - name: Open DNS port in UFW (Debian)
+      community.general.ufw:
+        rule: allow
+        port: "53"
+        proto: "{{ item }}"
+      loop:
+        - tcp
+        - udp
+      when:
+        - ansible_os_family == "Debian"
+        - bind_firewall_manage | bool
+
+  handlers:
+    - name: Reload BIND
+      ansible.builtin.systemd:
+        name: "{{ bind_service }}"
+        state: reloaded

@@ -1,0 +1,51 @@
+---
+- name: Rsync Backup Configuration
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Install rsync
+      ansible.builtin.package:
+        name: rsync
+        state: present
+
+    - name: Create log directory
+      ansible.builtin.file:
+        path: "{{ rsync_log_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0750'
+
+    - name: Deploy backup scripts
+      ansible.builtin.template:
+        src: backup-job.sh.j2
+        dest: "/usr/local/bin/rsync-backup-{{ item.name }}.sh"
+        owner: root
+        group: root
+        mode: '0750'
+      loop: "{{ rsync_backup_jobs }}"
+
+    - name: Schedule backup cron jobs
+      ansible.builtin.cron:
+        name: "rsync-backup-{{ item.name }}"
+        job: "/usr/local/bin/rsync-backup-{{ item.name }}.sh >> {{ rsync_log_dir }}/{{ item.name }}.log 2>&1"
+        minute: "{{ item.schedule.minute | default('0') }}"
+        hour: "{{ item.schedule.hour | default('2') }}"
+        day: "{{ item.schedule.day | default('*') }}"
+        month: "{{ item.schedule.month | default('*') }}"
+        weekday: "{{ item.schedule.weekday | default('*') }}"
+        user: root
+        state: present
+      loop: "{{ rsync_backup_jobs }}"
+
+    - name: Configure logrotate for backup logs
+      ansible.builtin.template:
+        src: logrotate.j2
+        dest: /etc/logrotate.d/rsync-backup
+        owner: root
+        group: root
+        mode: '0644'

@@ -1,0 +1,17 @@
+---
+target_hosts: all
+
+# Set these per host or use host_vars
+# hostname_fqdn: "server01.corp.local"
+# If not set, defaults to inventory_hostname
+hostname_fqdn: "{{ inventory_hostname }}"
+hostname_short: "{{ hostname_fqdn.split('.')[0] }}"
+
+# Update /etc/hosts loopback entry with the new hostname
+hostname_update_hosts_file: true
+
+# IP to use in /etc/hosts for this host (defaults to ansible_default_ipv4.address)
+hostname_ip: "{{ ansible_default_ipv4.address | default('127.0.1.1') }}"
+
+# Restart systemd-logind after hostname change (safe to leave true)
+hostname_restart_logind: true

@@ -1,0 +1,80 @@
+---
+- name: Postfix Email Relay Configuration
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Install Postfix and mailutils (Debian)
+      ansible.builtin.apt:
+        name:
+          - postfix
+          - mailutils
+          - libsasl2-modules
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install Postfix and mailutils (RedHat)
+      ansible.builtin.dnf:
+        name:
+          - postfix
+          - mailx
+          - cyrus-sasl-plain
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Configure /etc/postfix/main.cf
+      ansible.builtin.template:
+        src: main.cf.j2
+        dest: /etc/postfix/main.cf
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      notify: Restart Postfix
+
+    - name: Configure SASL credentials for relay authentication
+      ansible.builtin.copy:
+        content: "[{{ postfix_relayhost | regex_replace('\\[(.+?)\\].*', '\\1') }}] {{ postfix_relay_user }}:{{ postfix_relay_password }}\n"
+        dest: /etc/postfix/sasl_passwd
+        owner: root
+        group: root
+        mode: '0600'
+      when:
+        - postfix_relay_user != ''
+        - postfix_relay_password != ''
+      no_log: true
+      notify: Run postmap sasl_passwd
+
+    - name: Configure root email alias
+      ansible.builtin.lineinfile:
+        path: /etc/aliases
+        regexp: '^root:'
+        line: "root: {{ postfix_root_alias }}"
+        backup: true
+      when: postfix_root_alias != ''
+      notify: Run newaliases
+
+    - name: Enable and start Postfix
+      ansible.builtin.systemd:
+        name: postfix
+        enabled: true
+        state: started
+
+  handlers:
+    - name: Restart Postfix
+      ansible.builtin.systemd:
+        name: postfix
+        state: restarted
+
+    - name: Run postmap sasl_passwd
+      ansible.builtin.command: postmap /etc/postfix/sasl_passwd
+      changed_when: true
+      notify: Restart Postfix
+
+    - name: Run newaliases
+      ansible.builtin.command: newaliases
+      changed_when: true

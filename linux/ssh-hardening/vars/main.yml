@@ -1,0 +1,51 @@
+---
+# =============================================================================
+# SSH Hardening Variables
+# Populate these variables before running the playbook.
+# See README.md for full documentation and CRITICAL safety notes.
+# =============================================================================
+
+# Target hosts or group from your Ansible inventory
+target_hosts: all
+
+# SSH port (default: 22)
+ssh_port: 22
+
+# Root login: yes | no | prohibit-password | forced-commands-only
+ssh_permit_root_login: "no"
+
+# Password authentication (set no to require key-based auth)
+# WARNING: Ensure key-based auth is working before setting this to no
+ssh_password_authentication: "no"
+
+# Public key authentication
+ssh_pubkey_authentication: "yes"
+
+# Maximum authentication attempts per connection
+ssh_max_auth_tries: 3
+
+# Idle session timeout settings
+ssh_client_alive_interval: 300
+ssh_client_alive_count_max: 2
+
+# Restrict SSH access to specific users (empty = allow all users)
+ssh_allow_users: []
+# Example:
+# ssh_allow_users:
+#   - admin
+#   - deploy
+
+# Restrict SSH access to specific groups (empty = allow all groups)
+ssh_allow_groups: []
+# Example:
+# ssh_allow_groups:
+#   - sshusers
+#   - sudo
+
+# Logon banner (displayed before login prompt)
+# Set to "" to disable
+ssh_banner_message: |
+  ******************************************************************************
+  * Authorized access only. All activity may be monitored and reported.        *
+  * Unauthorized access is prohibited and may be subject to legal action.      *
+  ******************************************************************************

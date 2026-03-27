@@ -1,0 +1,27 @@
+# /etc/wireguard/{{ wg_interface }}.conf — managed by Ansible (linux/wireguard-vpn)
+# PRIVATE KEY STORED IN THIS FILE — KEEP PERMISSIONS 0600
+
+[Interface]
+Address = {{ wg_address }}
+ListenPort = {{ wg_port }}
+PrivateKey = {{ wg_private_key }}
+{% if wg_post_up %}
+PostUp = {{ wg_post_up }}
+{% endif %}
+{% if wg_post_down %}
+PostDown = {{ wg_post_down }}
+{% endif %}
+
+{% for peer in wg_peers %}
+[Peer]
+# {{ peer.name }}
+PublicKey = {{ peer.public_key }}
+AllowedIPs = {{ peer.allowed_ips }}
+{% if peer.endpoint is defined and peer.endpoint %}
+Endpoint = {{ peer.endpoint }}
+{% endif %}
+{% if peer.persistent_keepalive is defined %}
+PersistentKeepalive = {{ peer.persistent_keepalive }}
+{% endif %}
+
+{% endfor %}

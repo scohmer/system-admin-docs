@@ -1,0 +1,26 @@
+---
+target_hosts: all
+
+# GPG keys to import into /etc/apt/keyrings/
+apt_gpg_keys: []
+  # - name: docker
+  #   url: https://download.docker.com/linux/ubuntu/gpg
+
+# APT repositories to add
+apt_repos: []
+  # - name: docker
+  #   filename: docker
+  #   repo: >-
+  #     deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg]
+  #     https://download.docker.com/linux/ubuntu jammy stable
+
+# APT repository lines to remove
+apt_repos_remove: []
+  # - "deb http://old-repo.example.com/ubuntu focal main"
+
+# APT pinning preferences
+apt_pins: []
+  # - name: hold-nginx
+  #   package: nginx
+  #   pin: "version 1.24.*"
+  #   priority: 1001

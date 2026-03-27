@@ -1,0 +1,79 @@
+---
+# =============================================================================
+# Playbook: Service Management
+# Description: Start, stop, restart, enable, and disable systemd services.
+# Variables:   vars/main.yml
+# See README.md for variable documentation and usage.
+# =============================================================================
+
+- name: Linux Service Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: false
+
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+
+    # ------------------------------------------------------------------
+    # Optionally reload systemd daemon (for services added/modified)
+    # ------------------------------------------------------------------
+    - name: Reload systemd daemon where requested
+      ansible.builtin.systemd:
+        daemon_reload: true
+      when: services | selectattr('daemon_reload', 'defined') | selectattr('daemon_reload') | list | length > 0
+
+    # ------------------------------------------------------------------
+    # Check each service unit exists before attempting to manage it
+    # ------------------------------------------------------------------
+    - name: Check service unit files exist
+      ansible.builtin.command:
+        cmd: "systemctl list-unit-files {{ item.name }}.service"
+      register: unit_check
+      changed_when: false
+      failed_when: false
+      loop: "{{ services }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Warn on missing service units
+      ansible.builtin.debug:
+        msg: "WARNING: Service '{{ item.item.name }}' was not found on {{ inventory_hostname }}. Skipping."
+      loop: "{{ unit_check.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when: item.stdout is not defined or 'listed' not in item.stdout
+
+    # ------------------------------------------------------------------
+    # Manage services
+    # ------------------------------------------------------------------
+    - name: Manage systemd services
+      ansible.builtin.systemd:
+        name: "{{ item.item.name }}"
+        state: "{{ item.item.state | default('started') }}"
+        enabled: "{{ item.item.enabled | default(omit) }}"
+      loop: "{{ unit_check.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when: item.stdout is defined and 'listed' in item.stdout
+
+    # ------------------------------------------------------------------
+    # Report service status
+    # ------------------------------------------------------------------
+    - name: Get service status for managed services
+      ansible.builtin.command:
+        cmd: "systemctl is-active {{ item.name }}"
+      register: service_status
+      changed_when: false
+      failed_when: false
+      loop: "{{ services }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Display service status summary
+      ansible.builtin.debug:
+        msg: "{{ item.item.name }}: {{ item.stdout }}"
+      loop: "{{ service_status.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"

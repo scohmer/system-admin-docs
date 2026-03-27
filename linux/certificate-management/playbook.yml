@@ -1,0 +1,115 @@
+---
+- name: SSL/TLS Certificate Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Install CA certificate tools (Debian)
+      ansible.builtin.apt:
+        name: ca-certificates
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install CA certificate tools (RedHat)
+      ansible.builtin.dnf:
+        name: ca-certificates
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Create certificate base directory
+      ansible.builtin.file:
+        path: "{{ cert_base_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Deploy certificates (from content)
+      ansible.builtin.copy:
+        content: "{{ item.cert_content }}"
+        dest: "{{ item.dest_cert | default(cert_base_dir + '/' + item.name + '.crt') }}"
+        owner: root
+        group: root
+        mode: '0644'
+      loop: "{{ certificates }}"
+      when:
+        - certificates | length > 0
+        - item.cert_content is defined
+      no_log: false
+
+    - name: Deploy private keys (from content)
+      ansible.builtin.copy:
+        content: "{{ item.key_content }}"
+        dest: "{{ item.dest_key | default(cert_base_dir + '/' + item.name + '.key') }}"
+        owner: root
+        group: root
+        mode: '0600'
+      loop: "{{ certificates }}"
+      when:
+        - certificates | length > 0
+        - item.key_content is defined
+      no_log: true
+
+    - name: Deploy certificates (from file)
+      ansible.builtin.copy:
+        src: "{{ item.cert_src }}"
+        dest: "{{ item.dest_cert | default(cert_base_dir + '/' + item.name + '.crt') }}"
+        owner: root
+        group: root
+        mode: '0644'
+      loop: "{{ certificates }}"
+      when:
+        - certificates | length > 0
+        - item.cert_src is defined
+
+    - name: Deploy private keys (from file)
+      ansible.builtin.copy:
+        src: "{{ item.key_src }}"
+        dest: "{{ item.dest_key | default(cert_base_dir + '/' + item.name + '.key') }}"
+        owner: root
+        group: root
+        mode: '0600'
+      loop: "{{ certificates }}"
+      when:
+        - certificates | length > 0
+        - item.key_src is defined
+
+    # ── CA trust store management ────────────────────────────────────────────
+    - name: Deploy CA certificates to system trust store (Debian)
+      ansible.builtin.copy:
+        content: "{{ item.content }}"
+        dest: "/usr/local/share/ca-certificates/{{ item.name }}.crt"
+        owner: root
+        group: root
+        mode: '0644'
+      loop: "{{ ca_certificates }}"
+      when:
+        - ca_certificates | length > 0
+        - ansible_os_family == "Debian"
+      notify: Update CA trust (Debian)
+
+    - name: Deploy CA certificates to system trust store (RedHat)
+      ansible.builtin.copy:
+        content: "{{ item.content }}"
+        dest: "/etc/pki/ca-trust/source/anchors/{{ item.name }}.crt"
+        owner: root
+        group: root
+        mode: '0644'
+      loop: "{{ ca_certificates }}"
+      when:
+        - ca_certificates | length > 0
+        - ansible_os_family == "RedHat"
+      notify: Update CA trust (RedHat)
+
+  handlers:
+    - name: Update CA trust (Debian)
+      ansible.builtin.command: update-ca-certificates
+      changed_when: true
+
+    - name: Update CA trust (RedHat)
+      ansible.builtin.command: update-ca-trust extract
+      changed_when: true

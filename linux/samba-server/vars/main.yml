@@ -1,0 +1,38 @@
+---
+target_hosts: all
+
+samba_workgroup: WORKGROUP
+samba_server_string: "Samba File Server"
+
+# Samba shares to configure
+samba_shares:
+  - name: data
+    path: /srv/samba/data
+    comment: "Shared Data"
+    browseable: "yes"
+    writable: "yes"
+    guest_ok: "no"
+    valid_users: "@sambausers"
+    create_mask: "0664"
+    directory_mask: "0775"
+    owner: root
+    group: sambausers
+    mode: '0770'
+  # - name: public
+  #   path: /srv/samba/public
+  #   comment: "Public Read-Only Share"
+  #   browseable: "yes"
+  #   writable: "no"
+  #   guest_ok: "yes"
+  #   owner: nobody
+  #   group: nogroup
+  #   mode: '0755'
+
+# Samba users (must be Linux users too — created by playbook)
+# IMPORTANT: Use Ansible Vault to encrypt passwords in production
+samba_users: []
+  # - username: sambauser1
+  #   password: "ChangeMe123!"
+
+# Manage firewall rules
+samba_firewall_manage: true

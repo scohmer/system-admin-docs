@@ -1,0 +1,90 @@
+---
+# =============================================================================
+# Playbook: Package Management
+# Description: Install, update, and remove packages on Debian and RHEL hosts.
+# Variables:   vars/main.yml
+# See README.md for variable documentation and usage.
+# =============================================================================
+
+- name: Linux Package Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true   # Required for ansible_os_family
+
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+
+    # ------------------------------------------------------------------
+    # Debian / Ubuntu (apt)
+    # ------------------------------------------------------------------
+    - name: "[apt] Update package cache"
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600   # Skip if cache is less than 1 hour old
+      when: ansible_os_family == "Debian" and (update_cache | default(true))
+
+    - name: "[apt] Upgrade all packages"
+      ansible.builtin.apt:
+        upgrade: dist
+      when: ansible_os_family == "Debian" and (upgrade_all | default(false))
+
+    - name: "[apt] Install packages"
+      ansible.builtin.apt:
+        name: "{{ packages_to_install }}"
+        state: present
+      when:
+        - ansible_os_family == "Debian"
+        - packages_to_install | default([]) | length > 0
+
+    - name: "[apt] Remove packages"
+      ansible.builtin.apt:
+        name: "{{ packages_to_remove }}"
+        state: absent
+      when:
+        - ansible_os_family == "Debian"
+        - packages_to_remove | default([]) | length > 0
+
+    - name: "[apt] Autoremove unused dependencies"
+      ansible.builtin.apt:
+        autoremove: true
+      when: ansible_os_family == "Debian" and (autoremove | default(false))
+
+    # ------------------------------------------------------------------
+    # RHEL / CentOS / Rocky / AlmaLinux (dnf)
+    # ------------------------------------------------------------------
+    - name: "[dnf] Upgrade all packages"
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+      when: ansible_os_family == "RedHat" and (upgrade_all | default(false))
+
+    - name: "[dnf] Install packages"
+      ansible.builtin.dnf:
+        name: "{{ packages_to_install }}"
+        state: present
+      when:
+        - ansible_os_family == "RedHat"
+        - packages_to_install | default([]) | length > 0
+
+    - name: "[dnf] Remove packages"
+      ansible.builtin.dnf:
+        name: "{{ packages_to_remove }}"
+        state: absent
+      when:
+        - ansible_os_family == "RedHat"
+        - packages_to_remove | default([]) | length > 0
+
+    - name: "[dnf] Autoremove unused dependencies"
+      ansible.builtin.dnf:
+        autoremove: true
+      when: ansible_os_family == "RedHat" and (autoremove | default(false))
+
+    # ------------------------------------------------------------------
+    # Unsupported OS
+    # ------------------------------------------------------------------
+    - name: Warn on unsupported OS family
+      ansible.builtin.debug:
+        msg: "WARNING: OS family '{{ ansible_os_family }}' is not supported by this playbook."
+      when: ansible_os_family not in ["Debian", "RedHat"]

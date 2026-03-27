@@ -1,0 +1,34 @@
+---
+target_hosts: all
+
+# PAM limits entries for /etc/security/limits.conf
+ulimits:
+  # Increase open file limit for all users
+  - domain: "*"
+    type: soft
+    item: nofile
+    value: "65536"
+  - domain: "*"
+    type: hard
+    item: nofile
+    value: "1048576"
+  # Example: Elasticsearch requires high memlock
+  # - domain: elasticsearch
+  #   type: "-"
+  #   item: memlock
+  #   value: unlimited
+  # - domain: elasticsearch
+  #   type: "-"
+  #   item: nofile
+  #   value: "65536"
+  # Example: Limit nproc for web users
+  # - domain: "@webusers"
+  #   type: hard
+  #   item: nproc
+  #   value: "512"
+
+# Systemd global default limits (affects systemd-started services)
+systemd_default_limits:
+  nofile: "65536"
+  # nproc: "65536"
+  # memlock: unlimited

@@ -1,0 +1,17 @@
+---
+target_hosts: all
+
+# Failed login attempts before account lockout
+faillock_deny: 5
+
+# Lockout duration in seconds (0 = permanent until admin resets)
+faillock_unlock_time: 900   # 15 minutes
+
+# Time window for counting failures
+faillock_fail_interval: 900
+
+# Lock the root account too (use with caution)
+faillock_even_deny_root: false
+
+# Root lockout duration (if even_deny_root is true)
+faillock_root_unlock_time: 60

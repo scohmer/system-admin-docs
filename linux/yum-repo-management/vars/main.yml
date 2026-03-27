@@ -1,0 +1,30 @@
+---
+target_hosts: all
+
+# GPG keys to import before adding repos
+gpg_keys: []
+  # - https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-9
+
+# Repositories to add or update
+yum_repos:
+  - name: epel
+    description: "Extra Packages for Enterprise Linux 9 - $basearch"
+    baseurl: "https://dl.fedoraproject.org/pub/epel/9/Everything/$basearch/"
+    gpgcheck: true
+    gpgkey: "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-9"
+    enabled: true
+
+  # Internal mirror example:
+  # - name: internal-base
+  #   description: "Internal RHEL Base Mirror"
+  #   baseurl: "http://repo.corp.local/rhel9/BaseOS/$basearch/os/"
+  #   gpgcheck: false
+  #   enabled: true
+
+# Repository IDs to disable (but keep the .repo file)
+yum_repos_disable: []
+  # - crb
+
+# Repository IDs to remove entirely
+yum_repos_remove: []
+  # - old-internal-repo

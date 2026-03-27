@@ -1,0 +1,83 @@
+---
+# =============================================================================
+# Playbook: Cron Job Management
+# Description: Create, update, and remove cron jobs on managed hosts.
+# Variables:   vars/main.yml
+# See README.md for variable documentation and usage.
+# =============================================================================
+
+- name: Linux Cron Job Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: false
+
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+
+    # ------------------------------------------------------------------
+    # Ensure cron daemon is installed and running
+    # ------------------------------------------------------------------
+    - name: Ensure cron is installed (Debian)
+      ansible.builtin.apt:
+        name: cron
+        state: present
+        update_cache: false
+      when: ansible_os_family is defined and ansible_os_family == "Debian"
+
+    - name: Ensure crond is installed (RHEL)
+      ansible.builtin.dnf:
+        name: cronie
+        state: present
+      when: ansible_os_family is defined and ansible_os_family == "RedHat"
+
+    - name: Ensure cron daemon is running
+      ansible.builtin.service:
+        name: "{{ 'cron' if (ansible_os_family | default('Debian')) == 'Debian' else 'crond' }}"
+        state: started
+        enabled: true
+
+    # ------------------------------------------------------------------
+    # Manage cron jobs
+    # ------------------------------------------------------------------
+    - name: Create or remove cron jobs
+      ansible.builtin.cron:
+        name: "{{ item.name }}"
+        user: "{{ item.user | default('root') }}"
+        job: "{{ item.job }}"
+        minute: "{{ item.minute | default('*') }}"
+        hour: "{{ item.hour | default('*') }}"
+        day: "{{ item.day | default('*') }}"
+        month: "{{ item.month | default('*') }}"
+        weekday: "{{ item.weekday | default('*') }}"
+        state: "{{ item.state | default('present') }}"
+        disabled: "{{ item.disabled | default(false) }}"
+      loop: "{{ cron_jobs | default([]) }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    # ------------------------------------------------------------------
+    # Report crontabs for affected users
+    # ------------------------------------------------------------------
+    - name: Get list of users with cron jobs defined
+      ansible.builtin.set_fact:
+        cron_users: "{{ cron_jobs | default([]) | map(attribute='user', default='root') | unique | list }}"
+
+    - name: Display crontab for each affected user
+      ansible.builtin.command: "crontab -u {{ item }} -l"
+      register: crontab_output
+      changed_when: false
+      failed_when: false
+      loop: "{{ cron_users }}"
+      loop_control:
+        label: "{{ item }}"
+
+    - name: Show crontab contents
+      ansible.builtin.debug:
+        msg:
+          - "=== Crontab for user: {{ item.item }} on {{ inventory_hostname }} ==="
+          - "{{ item.stdout_lines | default(['(empty)']) }}"
+      loop: "{{ crontab_output.results }}"
+      loop_control:
+        label: "{{ item.item }}"

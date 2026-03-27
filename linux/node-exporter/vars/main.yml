@@ -1,0 +1,7 @@
+target_hosts: all
+node_exporter_version: "1.8.2"
+node_exporter_user: node_exporter
+node_exporter_port: 9100
+node_exporter_listen_address: "0.0.0.0"
+node_exporter_extra_args: ""
+node_exporter_firewall_manage: true

@@ -1,0 +1,50 @@
+global
+    log {{ haproxy_global.log }}
+    maxconn {{ haproxy_global.maxconn }}
+    user {{ haproxy_global.user }}
+    group {{ haproxy_global.group }}
+{% if haproxy_global.daemon %}
+    daemon
+{% endif %}
+
+defaults
+    mode {{ haproxy_defaults.mode }}
+    timeout connect {{ haproxy_defaults.timeout_connect }}
+    timeout client  {{ haproxy_defaults.timeout_client }}
+    timeout server  {{ haproxy_defaults.timeout_server }}
+{% if haproxy_defaults.option_httplog %}
+    option httplog
+{% endif %}
+{% if haproxy_defaults.option_dontlognull %}
+    option dontlognull
+{% endif %}
+{% if haproxy_defaults.option_forwardfor %}
+    option forwardfor
+{% endif %}
+{% if haproxy_defaults.option_http_server_close %}
+    option http-server-close
+{% endif %}
+
+{% for frontend in haproxy_frontends %}
+frontend {{ frontend.name }}
+    bind {{ frontend.bind }}
+    default_backend {{ frontend.default_backend }}
+
+{% endfor %}
+{% for backend in haproxy_backends %}
+backend {{ backend.name }}
+    balance {{ backend.balance }}
+{% for server in backend.servers %}
+    server {{ server.name }} {{ server.address }} {{ server.options | default('') }}
+{% endfor %}
+
+{% endfor %}
+{% if haproxy_stats_enable %}
+frontend stats
+    bind *:{{ haproxy_stats_port }}
+    stats enable
+    stats uri {{ haproxy_stats_uri }}
+    stats refresh 30s
+    stats auth {{ haproxy_stats_user }}:{{ haproxy_stats_password }}
+    stats hide-version
+{% endif %}

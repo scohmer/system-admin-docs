@@ -1,0 +1,70 @@
+---
+- name: Software RAID (mdadm) Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Install mdadm
+      ansible.builtin.package:
+        name: mdadm
+        state: present
+
+    - name: Configure mdadm.conf with email alerts
+      ansible.builtin.lineinfile:
+        path: /etc/mdadm/mdadm.conf
+        regexp: '^MAILADDR'
+        line: "MAILADDR {{ raid_monitor_email }}"
+        create: true
+        backup: true
+      when: ansible_os_family == "Debian"
+
+    - name: Configure mdadm.conf (RedHat)
+      ansible.builtin.lineinfile:
+        path: /etc/mdadm.conf
+        regexp: '^MAILADDR'
+        line: "MAILADDR {{ raid_monitor_email }}"
+        create: true
+        backup: true
+      when: ansible_os_family == "RedHat"
+
+    - name: Enable mdadm monitor service
+      ansible.builtin.systemd:
+        name: mdmonitor
+        enabled: true
+        state: started
+      failed_when: false
+
+    - name: Schedule weekly RAID consistency check
+      ansible.builtin.cron:
+        name: "raid-check"
+        job: "echo check > /sys/block/md0/md/sync_action 2>/dev/null || true"
+        minute: "{{ raid_check_schedule.minute | default('0') }}"
+        hour: "{{ raid_check_schedule.hour | default('0') }}"
+        weekday: "{{ raid_check_schedule.weekday | default('0') }}"
+        user: root
+
+    - name: Check current RAID status
+      ansible.builtin.command: cat /proc/mdstat
+      register: mdstat
+      changed_when: false
+
+    - name: Display RAID status
+      ansible.builtin.debug:
+        var: mdstat.stdout_lines
+
+    - name: Check mdadm array details
+      ansible.builtin.command: mdadm --detail --scan
+      register: mdadm_scan
+      changed_when: false
+
+    - name: Display array details
+      ansible.builtin.debug:
+        var: mdadm_scan.stdout_lines
+
+    - name: Alert if any array is degraded
+      ansible.builtin.fail:
+        msg: "DEGRADED RAID array detected! Check /proc/mdstat immediately."
+      when: "'_' in mdstat.stdout or 'FAILED' in mdstat.stdout"

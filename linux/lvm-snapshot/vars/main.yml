@@ -1,0 +1,19 @@
+---
+target_hosts: all
+
+# Action: list | create | remove
+lvm_snapshot_action: list
+
+# Snapshot definitions
+lvm_snapshots:
+  - origin_lv: /dev/vg0/root
+    snapshot_name: root-snap-prechange
+    size: 5G
+    # mount_point: /mnt/root-snapshot
+    # fstype: xfs
+
+  # - origin_lv: /dev/vg0/data
+  #   snapshot_name: data-snap-prechange
+  #   size: 20G
+  #   mount_point: /mnt/data-snapshot
+  #   fstype: ext4

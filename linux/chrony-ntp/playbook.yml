@@ -1,0 +1,62 @@
+---
+- name: Chrony NTP Configuration
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Install chrony (Debian)
+      ansible.builtin.apt:
+        name: chrony
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install chrony (RedHat)
+      ansible.builtin.dnf:
+        name: chrony
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Deploy chrony configuration
+      ansible.builtin.template:
+        src: chrony.conf.j2
+        dest: /etc/chrony.conf
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      notify: Restart chrony
+
+    - name: Enable and start chrony
+      ansible.builtin.systemd:
+        name: chronyd
+        enabled: true
+        state: started
+
+    - name: Open NTP port in firewalld (when serving clients)
+      ansible.posix.firewalld:
+        service: ntp
+        permanent: true
+        state: enabled
+        immediate: true
+      when:
+        - ansible_os_family == "RedHat"
+        - chrony_allow_clients | length > 0
+
+    - name: Verify time synchronization status
+      ansible.builtin.command: chronyc tracking
+      register: chrony_tracking
+      changed_when: false
+
+    - name: Display chrony tracking info
+      ansible.builtin.debug:
+        var: chrony_tracking.stdout_lines
+
+  handlers:
+    - name: Restart chrony
+      ansible.builtin.systemd:
+        name: chronyd
+        state: restarted

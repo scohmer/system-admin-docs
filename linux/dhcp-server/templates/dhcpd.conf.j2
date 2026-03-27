@@ -1,0 +1,27 @@
+# /etc/dhcp/dhcpd.conf — managed by Ansible (linux/dhcp-server)
+
+option domain-name "{{ dhcp_domain_name }}";
+option domain-name-servers {{ dhcp_dns_servers | join(', ') }};
+
+default-lease-time {{ dhcp_default_lease_time }};
+max-lease-time {{ dhcp_max_lease_time }};
+
+authoritative;
+log-facility local7;
+
+{% for subnet in dhcp_subnets %}
+subnet {{ subnet.network }} netmask {{ subnet.netmask }} {
+    range {{ subnet.range_start }} {{ subnet.range_end }};
+    option routers {{ subnet.gateway }};
+    option broadcast-address {{ subnet.broadcast }};
+}
+
+{% endfor %}
+
+{% for host in dhcp_host_reservations %}
+host {{ host.name }} {
+    hardware ethernet {{ host.mac }};
+    fixed-address {{ host.ip }};
+}
+
+{% endfor %}

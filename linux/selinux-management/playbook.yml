@@ -1,0 +1,86 @@
+---
+- name: SELinux Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    # ── Verify SELinux is available ─────────────────────────────────────────
+    - name: Fail if not a RedHat-family system
+      ansible.builtin.fail:
+        msg: "SELinux management is only supported on RedHat-family systems."
+      when: ansible_os_family != "RedHat"
+
+    # ── Install SELinux management tools ────────────────────────────────────
+    - name: Install SELinux management packages
+      ansible.builtin.dnf:
+        name:
+          - policycoreutils
+          - policycoreutils-python-utils
+          - selinux-policy
+          - selinux-policy-targeted
+        state: present
+
+    # ── Set SELinux mode ────────────────────────────────────────────────────
+    - name: Set SELinux mode in config file (persistent)
+      ansible.builtin.lineinfile:
+        path: /etc/selinux/config
+        regexp: '^SELINUX='
+        line: "SELINUX={{ selinux_state }}"
+        backup: true
+      notify: Reboot required for mode change
+
+    - name: Set SELinux policy in config file
+      ansible.builtin.lineinfile:
+        path: /etc/selinux/config
+        regexp: '^SELINUXTYPE='
+        line: "SELINUXTYPE={{ selinux_policy }}"
+
+    - name: Set SELinux mode at runtime (enforcing or permissive only)
+      ansible.builtin.command: setenforce {{ '1' if selinux_state == 'enforcing' else '0' }}
+      when: selinux_state in ['enforcing', 'permissive']
+      changed_when: true
+      failed_when: false
+
+    # ── Manage booleans ─────────────────────────────────────────────────────
+    - name: Set SELinux booleans
+      ansible.posix.seboolean:
+        name: "{{ item.name }}"
+        state: "{{ item.state }}"
+        persistent: true
+      loop: "{{ selinux_booleans }}"
+      when: selinux_booleans | length > 0
+
+    # ── Manage file contexts ─────────────────────────────────────────────────
+    - name: Set SELinux file contexts
+      community.general.sefcontext:
+        target: "{{ item.path }}"
+        setype: "{{ item.setype }}"
+        state: present
+      loop: "{{ selinux_fcontexts }}"
+      when: selinux_fcontexts | length > 0
+
+    - name: Apply file context changes (restorecon)
+      ansible.builtin.command: restorecon -Rv {{ item.path }}
+      loop: "{{ selinux_fcontexts }}"
+      when: selinux_fcontexts | length > 0
+      changed_when: true
+
+    # ── Manage port labels ───────────────────────────────────────────────────
+    - name: Set SELinux port labels
+      community.general.seport:
+        ports: "{{ item.port }}"
+        proto: "{{ item.proto | default('tcp') }}"
+        setype: "{{ item.setype }}"
+        state: present
+      loop: "{{ selinux_ports }}"
+      when: selinux_ports | length > 0
+
+  handlers:
+    - name: Reboot required for mode change
+      ansible.builtin.debug:
+        msg: >
+          NOTE: A reboot is required for SELinux mode changes to take full effect
+          (especially when enabling after 'disabled' state).

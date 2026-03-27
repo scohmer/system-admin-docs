@@ -1,0 +1,82 @@
+---
+- name: APT Repository Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Fail if not a Debian-family system
+      ansible.builtin.fail:
+        msg: "This playbook is for Debian/Ubuntu only. Use yum-repo-management for RHEL."
+      when: ansible_os_family != "Debian"
+
+    - name: Install required packages for repo management
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+          - apt-transport-https
+        state: present
+        update_cache: true
+
+    - name: Create keyrings directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Import GPG keys for repositories
+      ansible.builtin.shell: |
+        curl -fsSL {{ item.url }} | gpg --dearmor -o /etc/apt/keyrings/{{ item.name }}.gpg
+        chmod a+r /etc/apt/keyrings/{{ item.name }}.gpg
+      args:
+        creates: "/etc/apt/keyrings/{{ item.name }}.gpg"
+      loop: "{{ apt_gpg_keys }}"
+      when: apt_gpg_keys | length > 0
+
+    - name: Add APT repositories
+      ansible.builtin.apt_repository:
+        repo: "{{ item.repo }}"
+        state: present
+        filename: "{{ item.filename | default(item.name) }}"
+        update_cache: false
+      loop: "{{ apt_repos }}"
+      when: apt_repos | length > 0
+      notify: Update apt cache
+
+    - name: Remove APT repositories
+      ansible.builtin.apt_repository:
+        repo: "{{ item }}"
+        state: absent
+        update_cache: false
+      loop: "{{ apt_repos_remove }}"
+      when: apt_repos_remove | length > 0
+      notify: Update apt cache
+
+    - name: Configure APT pinning preferences
+      ansible.builtin.template:
+        src: apt-pinning.j2
+        dest: "/etc/apt/preferences.d/{{ item.name }}"
+        owner: root
+        group: root
+        mode: '0644'
+      loop: "{{ apt_pins }}"
+      when: apt_pins | length > 0
+
+    - name: Flush handlers to update apt cache
+      ansible.builtin.meta: flush_handlers
+
+    - name: List enabled repositories
+      ansible.builtin.command: apt-cache policy
+      register: apt_policy
+      changed_when: false
+
+  handlers:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true

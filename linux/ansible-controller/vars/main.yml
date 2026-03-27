@@ -1,0 +1,57 @@
+---
+# =============================================================================
+# Ansible Controller Scheduling Variables
+# Populate these variables before running the playbook.
+# See README.md for full documentation and security notes.
+# =============================================================================
+
+# User on the controller that will own the cron jobs and run playbooks
+controller_user: ansible
+
+# Absolute path to this repository on the controller
+repo_path: /opt/system-admin-docs
+
+# Path to the Ansible inventory file
+inventory_path: /etc/ansible/hosts
+
+# Directory for playbook run logs
+log_dir: /var/log/ansible
+
+# Playbooks to schedule
+scheduled_playbooks:
+
+  # Example: Run system patching on all hosts every Sunday at 3:00 AM
+  - name: "Weekly system patching"
+    playbook: "linux/system-patching/playbook.yml"
+    vars_file: "linux/system-patching/vars/main.yml"
+    extra_vars:
+      update_type: security
+      reboot_if_required: false
+    limit: ""
+    minute: "0"
+    hour: "3"
+    weekday: "0"
+    enabled: true
+
+  # Example: Check disk usage on all hosts every day at 7:00 AM
+  - name: "Daily disk usage check"
+    playbook: "linux/disk-management/playbook.yml"
+    vars_file: "linux/disk-management/vars/main.yml"
+    extra_vars:
+      lvm_volumes: []
+    limit: ""
+    minute: "0"
+    hour: "7"
+    weekday: "*"
+    enabled: true
+
+  # Example: Verify service state every 30 minutes
+  # - name: "Service health check"
+  #   playbook: "linux/service-management/playbook.yml"
+  #   vars_file: "linux/service-management/vars/main.yml"
+  #   extra_vars: {}
+  #   limit: ""
+  #   minute: "*/30"
+  #   hour: "*"
+  #   weekday: "*"
+  #   enabled: false

@@ -1,0 +1,29 @@
+// named.conf.local — managed by Ansible (linux/bind-dns)
+
+options {
+    directory "/var/cache/bind";
+    listen-on { {{ bind_listen_on }}; };
+    allow-query { {{ bind_allow_query }}; };
+    recursion {{ 'yes' if bind_allow_recursion else 'no' }};
+    allow-recursion { {{ bind_allow_recursion }}; };
+
+{% if bind_forwarders | length > 0 %}
+    forwarders {
+{% for fw in bind_forwarders %}
+        {{ fw }};
+{% endfor %}
+    };
+    forward only;
+{% endif %}
+
+    dnssec-validation auto;
+    auth-nxdomain no;
+};
+
+{% for zone in bind_zones %}
+zone "{{ zone.name }}" {
+    type {{ zone.type | default('master') }};
+    file "{{ bind_zonedir }}/db.{{ zone.name }}";
+    allow-transfer { none; };
+};
+{% endfor %}

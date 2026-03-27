@@ -1,0 +1,36 @@
+---
+- name: Hosts File Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Add or update /etc/hosts entries
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: "{{ item.regexp | default('\\s' + item.hostname + '(\\s|$)') }}"
+        line: "{{ item.ip }}\t{{ item.hostname }}{% if item.aliases is defined %} {{ item.aliases | join(' ') }}{% endif %}"
+        state: present
+        backup: true
+      loop: "{{ hosts_entries }}"
+      when: hosts_entries | length > 0
+
+    - name: Remove /etc/hosts entries by hostname
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: "\\s{{ item }}(\\s|$)"
+        state: absent
+        backup: true
+      loop: "{{ hosts_entries_remove }}"
+      when: hosts_entries_remove | length > 0
+
+    - name: Display current /etc/hosts
+      ansible.builtin.command: cat /etc/hosts
+      register: hosts_content
+      changed_when: false
+
+    - name: Show /etc/hosts content
+      ansible.builtin.debug:
+        var: hosts_content.stdout_lines

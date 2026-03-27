@@ -1,0 +1,63 @@
+---
+- name: ISC DHCP Server Configuration
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  vars:
+    dhcp_service: "{{ 'isc-dhcp-server' if ansible_os_family == 'Debian' else 'dhcpd' }}"
+    dhcp_conffile: "{{ '/etc/dhcp/dhcpd.conf' if ansible_os_family == 'Debian' else '/etc/dhcp/dhcpd.conf' }}"
+
+  tasks:
+    - name: Install ISC DHCP server (Debian)
+      ansible.builtin.apt:
+        name: isc-dhcp-server
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install DHCP server (RedHat)
+      ansible.builtin.dnf:
+        name: dhcp-server
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Configure DHCP listening interface (Debian)
+      ansible.builtin.lineinfile:
+        path: /etc/default/isc-dhcp-server
+        regexp: '^INTERFACESv4='
+        line: 'INTERFACESv4="{{ dhcp_interface }}"'
+        backup: true
+      when: ansible_os_family == "Debian"
+
+    - name: Deploy dhcpd.conf
+      ansible.builtin.template:
+        src: dhcpd.conf.j2
+        dest: "{{ dhcp_conffile }}"
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      notify: Restart DHCP
+
+    - name: Enable and start DHCP server
+      ansible.builtin.systemd:
+        name: "{{ dhcp_service }}"
+        enabled: true
+        state: started
+
+    - name: Open DHCP port in firewalld (RedHat)
+      ansible.posix.firewalld:
+        service: dhcp
+        permanent: true
+        state: enabled
+        immediate: true
+      when: ansible_os_family == "RedHat"
+
+  handlers:
+    - name: Restart DHCP
+      ansible.builtin.systemd:
+        name: "{{ dhcp_service }}"
+        state: restarted

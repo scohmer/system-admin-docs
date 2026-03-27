@@ -1,0 +1,107 @@
+---
+- name: Nginx Web Server Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Install Nginx (Debian)
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install Nginx (RedHat)
+      ansible.builtin.dnf:
+        name: nginx
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Configure nginx.conf main settings
+      ansible.builtin.lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '^worker_processes'
+        line: "worker_processes {{ nginx_worker_processes }};"
+        backup: true
+      notify: Reload Nginx
+
+    - name: Remove default site (Debian)
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      when:
+        - ansible_os_family == "Debian"
+        - nginx_remove_default | bool
+      notify: Reload Nginx
+
+    - name: Deploy virtual host configurations (Debian)
+      ansible.builtin.template:
+        src: vhost.conf.j2
+        dest: "/etc/nginx/sites-available/{{ item.name }}.conf"
+        owner: root
+        group: root
+        mode: '0644'
+      loop: "{{ nginx_vhosts }}"
+      when:
+        - nginx_vhosts | length > 0
+        - ansible_os_family == "Debian"
+      notify: Reload Nginx
+
+    - name: Enable virtual hosts (Debian)
+      ansible.builtin.file:
+        src: "/etc/nginx/sites-available/{{ item.name }}.conf"
+        dest: "/etc/nginx/sites-enabled/{{ item.name }}.conf"
+        state: link
+      loop: "{{ nginx_vhosts }}"
+      when:
+        - nginx_vhosts | length > 0
+        - ansible_os_family == "Debian"
+
+    - name: Deploy virtual host configurations (RedHat)
+      ansible.builtin.template:
+        src: vhost.conf.j2
+        dest: "/etc/nginx/conf.d/{{ item.name }}.conf"
+        owner: root
+        group: root
+        mode: '0644'
+      loop: "{{ nginx_vhosts }}"
+      when:
+        - nginx_vhosts | length > 0
+        - ansible_os_family == "RedHat"
+      notify: Reload Nginx
+
+    - name: Enable and start Nginx
+      ansible.builtin.systemd:
+        name: nginx
+        enabled: true
+        state: started
+
+    - name: Open HTTP/HTTPS in firewalld (RedHat)
+      ansible.posix.firewalld:
+        service: "{{ item }}"
+        permanent: true
+        state: enabled
+        immediate: true
+      loop:
+        - http
+        - https
+      when:
+        - ansible_os_family == "RedHat"
+        - nginx_firewall_manage | bool
+
+    - name: Open HTTP/HTTPS in UFW (Debian)
+      community.general.ufw:
+        rule: allow
+        name: "Nginx Full"
+      when:
+        - ansible_os_family == "Debian"
+        - nginx_firewall_manage | bool
+
+  handlers:
+    - name: Reload Nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: reloaded

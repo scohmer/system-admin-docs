@@ -1,0 +1,37 @@
+---
+# Target hosts or group from inventory
+target_hosts: all
+
+# SELinux state: enforcing | permissive | disabled
+# NOTE: Changing from/to 'disabled' requires a reboot and a full filesystem relabel
+selinux_state: enforcing
+
+# SELinux policy type
+selinux_policy: targeted
+
+# SELinux booleans to set
+# name: SELinux boolean name
+# state: true | false
+selinux_booleans:
+  - name: httpd_can_network_connect
+    state: false
+  - name: httpd_use_nfs
+    state: false
+  # - name: samba_export_all_rw
+  #   state: true
+
+# SELinux file contexts to apply
+# path: filesystem path (supports regex)
+# setype: SELinux type label
+selinux_fcontexts: []
+  # - path: /srv/myapp(/.*)?
+  #   setype: httpd_sys_content_t
+
+# SELinux port labels
+# port: port number or range (e.g., 8080 or 8080-8090)
+# proto: tcp | udp
+# setype: SELinux type label
+selinux_ports: []
+  # - port: 8080
+  #   proto: tcp
+  #   setype: http_port_t

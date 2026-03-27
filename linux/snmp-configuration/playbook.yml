@@ -1,0 +1,80 @@
+---
+- name: SNMP (Net-SNMP) Configuration
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Install Net-SNMP (Debian)
+      ansible.builtin.apt:
+        name:
+          - snmpd
+          - snmp
+          - libsnmp-dev
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install Net-SNMP (RedHat)
+      ansible.builtin.dnf:
+        name:
+          - net-snmp
+          - net-snmp-utils
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Deploy snmpd.conf
+      ansible.builtin.template:
+        src: snmpd.conf.j2
+        dest: /etc/snmp/snmpd.conf
+        owner: root
+        group: root
+        mode: '0600'
+        backup: true
+      notify: Restart snmpd
+
+    - name: Create SNMPv3 users
+      ansible.builtin.command: >
+        net-snmp-create-v3-user
+        -ro
+        -A {{ item.auth_password }}
+        -a {{ item.auth_protocol | default('SHA') }}
+        -X {{ item.priv_password }}
+        -x {{ item.priv_protocol | default('AES') }}
+        {{ item.username }}
+      loop: "{{ snmp_v3_users }}"
+      when: snmp_v3_users | length > 0
+      no_log: true
+      changed_when: true
+      notify: Restart snmpd
+
+    - name: Enable and start snmpd
+      ansible.builtin.systemd:
+        name: snmpd
+        enabled: true
+        state: started
+
+    - name: Open SNMP port in firewalld (RedHat)
+      ansible.posix.firewalld:
+        service: snmp
+        permanent: true
+        state: enabled
+        immediate: true
+      when: ansible_os_family == "RedHat"
+
+    - name: Open SNMP port in UFW (Debian)
+      community.general.ufw:
+        rule: allow
+        port: "161"
+        proto: udp
+        src: "{{ item }}"
+      loop: "{{ snmp_allowed_sources }}"
+      when: ansible_os_family == "Debian"
+
+  handlers:
+    - name: Restart snmpd
+      ansible.builtin.systemd:
+        name: snmpd
+        state: restarted

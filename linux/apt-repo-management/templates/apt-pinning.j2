@@ -1,0 +1,4 @@
+# APT pinning: {{ item.name }} — managed by Ansible (linux/apt-repo-management)
+Package: {{ item.package }}
+Pin: {{ item.pin }}
+Pin-Priority: {{ item.priority }}

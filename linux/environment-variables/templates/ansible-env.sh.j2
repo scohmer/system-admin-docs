@@ -1,0 +1,11 @@
+#!/bin/sh
+# /etc/profile.d/ansible-env.sh — managed by Ansible (linux/environment-variables)
+# Sourced for all interactive login shells.
+
+{% for key, value in env_profile_vars.items() %}
+{% if key == 'PATH_ADD' %}
+export PATH="{{ value }}:$PATH"
+{% else %}
+export {{ key }}="{{ value }}"
+{% endif %}
+{% endfor %}

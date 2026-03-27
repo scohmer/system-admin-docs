@@ -1,0 +1,122 @@
+---
+# =============================================================================
+# Playbook: Firewall Management
+# Description: Configure firewalld (RHEL) or ufw (Debian) rules.
+# Variables:   vars/main.yml
+# See README.md for variable documentation and safety notes.
+# =============================================================================
+
+- name: Linux Firewall Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+
+    # ------------------------------------------------------------------
+    # Detect which firewall is in use
+    # ------------------------------------------------------------------
+    - name: Check if firewalld is available
+      ansible.builtin.command: systemctl is-active firewalld
+      register: firewalld_status
+      changed_when: false
+      failed_when: false
+
+    - name: Check if ufw is available
+      ansible.builtin.command: systemctl is-active ufw
+      register: ufw_status
+      changed_when: false
+      failed_when: false
+
+    - name: Set firewall_type fact
+      ansible.builtin.set_fact:
+        firewall_type: >-
+          {{ 'firewalld' if firewalld_status.rc == 0
+             else ('ufw' if ufw_status.rc == 0
+             else 'none') }}
+
+    - name: Display detected firewall
+      ansible.builtin.debug:
+        msg: "Detected firewall: {{ firewall_type }}"
+
+    - name: Warn if no supported firewall detected
+      ansible.builtin.debug:
+        msg: "WARNING: No supported firewall (firewalld or ufw) found on {{ inventory_hostname }}. Skipping."
+      when: firewall_type == 'none'
+
+    # ------------------------------------------------------------------
+    # firewalld rules
+    # ------------------------------------------------------------------
+    - name: "[firewalld] Ensure firewalld is enabled and running"
+      ansible.builtin.systemd:
+        name: firewalld
+        state: started
+        enabled: true
+      when: firewall_type == 'firewalld'
+
+    - name: "[firewalld] Add or remove port rules"
+      ansible.posix.firewalld:
+        port: "{{ item.port }}/{{ item.protocol | default('tcp') }}"
+        zone: "{{ item.zone | default(firewalld_default_zone) }}"
+        state: "{{ item.state | default('enabled') }}"
+        permanent: true
+        immediate: true
+        source: "{{ item.source | default(omit) }}"
+      loop: "{{ firewall_rules | default([]) }}"
+      loop_control:
+        label: "{{ item.port }}/{{ item.protocol | default('tcp') }}"
+      when: firewall_type == 'firewalld'
+
+    # ------------------------------------------------------------------
+    # ufw rules
+    # ------------------------------------------------------------------
+    - name: "[ufw] Ensure ufw is installed (Debian)"
+      ansible.builtin.apt:
+        name: ufw
+        state: present
+        update_cache: false
+      when:
+        - firewall_type == 'ufw'
+        - ansible_os_family == 'Debian'
+
+    - name: "[ufw] Enable ufw with default deny incoming"
+      community.general.ufw:
+        state: enabled
+        default: deny
+        direction: incoming
+      when: firewall_type == 'ufw'
+
+    - name: "[ufw] Apply port rules"
+      community.general.ufw:
+        rule: "{{ 'allow' if item.state | default('enabled') == 'enabled' else 'deny' }}"
+        port: "{{ item.port | string }}"
+        proto: "{{ item.protocol | default('tcp') }}"
+        src: "{{ item.source | default('any') }}"
+        comment: "{{ item.comment | default('') }}"
+      loop: "{{ firewall_rules | default([]) }}"
+      loop_control:
+        label: "{{ item.port }}/{{ item.protocol | default('tcp') }}"
+      when: firewall_type == 'ufw'
+
+    # ------------------------------------------------------------------
+    # Report active rules
+    # ------------------------------------------------------------------
+    - name: "[firewalld] List active rules"
+      ansible.builtin.command: firewall-cmd --list-all
+      register: firewalld_rules_output
+      changed_when: false
+      when: firewall_type == 'firewalld'
+
+    - name: "[ufw] List active rules"
+      ansible.builtin.command: ufw status verbose
+      register: ufw_rules_output
+      changed_when: false
+      when: firewall_type == 'ufw'
+
+    - name: Display active firewall rules
+      ansible.builtin.debug:
+        msg: "{{ (firewalld_rules_output.stdout_lines if firewall_type == 'firewalld' else ufw_rules_output.stdout_lines) | default(['No output']) }}"
+      when: firewall_type != 'none'

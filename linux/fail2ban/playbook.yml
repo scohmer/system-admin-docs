@@ -1,0 +1,63 @@
+---
+- name: Fail2ban Configuration
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Install fail2ban (Debian)
+      ansible.builtin.apt:
+        name: fail2ban
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install fail2ban (RedHat)
+      ansible.builtin.dnf:
+        name: fail2ban
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Deploy fail2ban global configuration (jail.local)
+      ansible.builtin.template:
+        src: jail.local.j2
+        dest: /etc/fail2ban/jail.local
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      notify: Restart fail2ban
+
+    - name: Deploy individual jail configurations
+      ansible.builtin.template:
+        src: jail.d.j2
+        dest: "/etc/fail2ban/jail.d/{{ item.name }}.conf"
+        owner: root
+        group: root
+        mode: '0644'
+      loop: "{{ fail2ban_jails }}"
+      when: fail2ban_jails | length > 0
+      notify: Restart fail2ban
+
+    - name: Enable and start fail2ban
+      ansible.builtin.systemd:
+        name: fail2ban
+        enabled: true
+        state: started
+
+    - name: Verify fail2ban status
+      ansible.builtin.command: fail2ban-client status
+      register: f2b_status
+      changed_when: false
+
+    - name: Display fail2ban status
+      ansible.builtin.debug:
+        var: f2b_status.stdout_lines
+
+  handlers:
+    - name: Restart fail2ban
+      ansible.builtin.systemd:
+        name: fail2ban
+        state: restarted

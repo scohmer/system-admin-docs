@@ -1,0 +1,16 @@
+---
+target_hosts: all
+
+# Enable or disable swap (set false for Kubernetes nodes)
+swap_enabled: true
+
+# Swap file path and size
+swap_file_path: /swapfile
+swap_file_size_mb: 2048    # 2GB
+
+# Swappiness: 0-100 (0 = avoid swap, 100 = use swap aggressively)
+# Recommended: 10 for application servers, 60 for desktops
+vm_swappiness: 10
+
+# VFS cache pressure: >100 favors reclaiming cache, <100 retains more cache
+vm_vfs_cache_pressure: 50

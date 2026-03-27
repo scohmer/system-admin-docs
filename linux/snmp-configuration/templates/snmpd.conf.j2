@@ -1,0 +1,40 @@
+# /etc/snmp/snmpd.conf — managed by Ansible (linux/snmp-configuration)
+# NOTE: File permissions 0600 — contains sensitive credentials
+
+sysLocation {{ snmp_location }}
+sysContact  {{ snmp_contact }}
+sysServices 72
+
+# Agent configuration
+agentaddress udp:161
+
+# View definition
+view systemonly included .1.3.6.1.2.1.1
+view systemonly included .1.3.6.1.2.1.25.1
+view all       included .1
+
+{% if snmp_version in ['v2c', 'both'] %}
+# SNMPv2c access
+{% for src in snmp_allowed_sources %}
+rocommunity {{ snmp_community }} {{ src }}
+{% endfor %}
+{% endif %}
+
+{% if snmp_version in ['v3', 'both'] %}
+# SNMPv3 access (users created via net-snmp-create-v3-user)
+{% for user in snmp_v3_users %}
+rouser {{ user.username }} authPriv
+{% endfor %}
+{% endif %}
+
+# Disk usage monitoring
+disk /  10%
+disk /var 10%
+
+# Load thresholds (warn if 1m/5m/15m load exceeds these)
+load 12 10 8
+
+{% if snmp_traps_enabled and snmp_trap_sink %}
+# Send traps to NMS
+trap2sink {{ snmp_trap_sink }} {{ snmp_community }}
+{% endif %}

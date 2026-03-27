@@ -1,0 +1,122 @@
+---
+- name: Apache HTTP Server Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  vars:
+    apache_service: "{{ 'apache2' if ansible_os_family == 'Debian' else 'httpd' }}"
+    apache_confdir: "{{ '/etc/apache2' if ansible_os_family == 'Debian' else '/etc/httpd' }}"
+
+  tasks:
+    - name: Install Apache (Debian)
+      ansible.builtin.apt:
+        name: apache2
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install Apache (RedHat)
+      ansible.builtin.dnf:
+        name: httpd
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Enable Apache modules (Debian)
+      community.general.apache2_module:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ apache_modules_enable }}"
+      when:
+        - apache_modules_enable | length > 0
+        - ansible_os_family == "Debian"
+      notify: Reload Apache
+
+    - name: Disable Apache modules (Debian)
+      community.general.apache2_module:
+        name: "{{ item }}"
+        state: absent
+      loop: "{{ apache_modules_disable }}"
+      when:
+        - apache_modules_disable | length > 0
+        - ansible_os_family == "Debian"
+      notify: Reload Apache
+
+    - name: Remove default welcome page (RedHat)
+      ansible.builtin.file:
+        path: /etc/httpd/conf.d/welcome.conf
+        state: absent
+      when:
+        - ansible_os_family == "RedHat"
+        - apache_remove_default | bool
+      notify: Reload Apache
+
+    - name: Deploy virtual host configurations (Debian)
+      ansible.builtin.template:
+        src: vhost.conf.j2
+        dest: "/etc/apache2/sites-available/{{ item.name }}.conf"
+        owner: root
+        group: root
+        mode: '0644'
+      loop: "{{ apache_vhosts }}"
+      when:
+        - apache_vhosts | length > 0
+        - ansible_os_family == "Debian"
+      notify: Reload Apache
+
+    - name: Enable virtual hosts (Debian)
+      ansible.builtin.command: a2ensite {{ item.name }}.conf
+      loop: "{{ apache_vhosts }}"
+      when:
+        - apache_vhosts | length > 0
+        - ansible_os_family == "Debian"
+      changed_when: true
+      notify: Reload Apache
+
+    - name: Deploy virtual host configurations (RedHat)
+      ansible.builtin.template:
+        src: vhost.conf.j2
+        dest: "/etc/httpd/conf.d/{{ item.name }}.conf"
+        owner: root
+        group: root
+        mode: '0644'
+      loop: "{{ apache_vhosts }}"
+      when:
+        - apache_vhosts | length > 0
+        - ansible_os_family == "RedHat"
+      notify: Reload Apache
+
+    - name: Enable and start Apache
+      ansible.builtin.systemd:
+        name: "{{ apache_service }}"
+        enabled: true
+        state: started
+
+    - name: Open HTTP/HTTPS in firewalld (RedHat)
+      ansible.posix.firewalld:
+        service: "{{ item }}"
+        permanent: true
+        state: enabled
+        immediate: true
+      loop:
+        - http
+        - https
+      when:
+        - ansible_os_family == "RedHat"
+        - apache_firewall_manage | bool
+
+    - name: Open HTTP/HTTPS in UFW (Debian)
+      community.general.ufw:
+        rule: allow
+        name: "Apache Full"
+      when:
+        - ansible_os_family == "Debian"
+        - apache_firewall_manage | bool
+
+  handlers:
+    - name: Reload Apache
+      ansible.builtin.systemd:
+        name: "{{ apache_service }}"
+        state: reloaded

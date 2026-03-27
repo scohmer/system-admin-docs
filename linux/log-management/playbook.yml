@@ -1,0 +1,149 @@
+---
+# =============================================================================
+# Playbook: Log Management
+# Description: Configure rsyslog remote forwarding and logrotate policies.
+# Variables:   vars/main.yml
+# See README.md for variable documentation and usage.
+# =============================================================================
+
+- name: Linux Log Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - vars/main.yml
+
+  handlers:
+    - name: Restart rsyslog
+      ansible.builtin.systemd:
+        name: rsyslog
+        state: restarted
+
+  tasks:
+
+    # ------------------------------------------------------------------
+    # Ensure required packages are installed
+    # ------------------------------------------------------------------
+    - name: Ensure rsyslog is installed (Debian)
+      ansible.builtin.apt:
+        name: rsyslog
+        state: present
+        update_cache: false
+      when: ansible_os_family == "Debian"
+
+    - name: Ensure rsyslog is installed (RHEL)
+      ansible.builtin.dnf:
+        name: rsyslog
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Ensure rsyslog is enabled and started
+      ansible.builtin.systemd:
+        name: rsyslog
+        state: started
+        enabled: true
+
+    # ------------------------------------------------------------------
+    # rsyslog remote forwarding
+    # ------------------------------------------------------------------
+    - name: Configure rsyslog remote forwarding
+      ansible.builtin.template:
+        src: rsyslog-forward.conf.j2
+        dest: /etc/rsyslog.d/50-remote-forward.conf
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      when: rsyslog_forward_enabled | default(false)
+      notify: Restart rsyslog
+
+    - name: Remove rsyslog remote forwarding config when disabled
+      ansible.builtin.file:
+        path: /etc/rsyslog.d/50-remote-forward.conf
+        state: absent
+      when: not (rsyslog_forward_enabled | default(false))
+      notify: Restart rsyslog
+
+    # ------------------------------------------------------------------
+    # Inline rsyslog forward config template
+    # ------------------------------------------------------------------
+    - name: Write rsyslog forwarding config directly
+      ansible.builtin.copy:
+        content: |
+          # Ansible-managed: rsyslog remote forwarding
+          # Forwards all log messages to the remote syslog server
+          {% if rsyslog_remote_protocol == 'tcp' %}
+          *.* @@{{ rsyslog_remote_host }}:{{ rsyslog_remote_port }}
+          {% else %}
+          *.* @{{ rsyslog_remote_host }}:{{ rsyslog_remote_port }}
+          {% endif %}
+        dest: /etc/rsyslog.d/50-remote-forward.conf
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      when:
+        - rsyslog_forward_enabled | default(false)
+        - rsyslog_remote_host is defined
+      notify: Restart rsyslog
+
+    # ------------------------------------------------------------------
+    # logrotate configuration
+    # ------------------------------------------------------------------
+    - name: Write logrotate configurations
+      ansible.builtin.copy:
+        content: |
+          # Ansible-managed logrotate config for {{ item.name }}
+          {{ item.path }} {
+              {{ item.frequency | default('daily') }}
+              rotate {{ item.rotate | default(14) }}
+              {% if item.compress | default(true) %}compress{% endif %}
+
+              {% if item.delaycompress | default(true) %}delaycompress{% endif %}
+
+              {% if item.missingok | default(true) %}missingok{% endif %}
+
+              {% if item.notifempty | default(true) %}notifempty{% endif %}
+
+              {% if item.create is defined %}create {{ item.create }}{% endif %}
+
+              {% if item.postrotate is defined %}
+              postrotate
+                  {{ item.postrotate | indent(8) }}
+              endscript
+              {% endif %}
+          }
+        dest: "/etc/logrotate.d/{{ item.name }}"
+        owner: root
+        group: root
+        mode: '0644'
+      loop: "{{ logrotate_configs | default([]) }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    # ------------------------------------------------------------------
+    # Verify logrotate configuration
+    # ------------------------------------------------------------------
+    - name: Test logrotate configuration
+      ansible.builtin.command: logrotate --debug /etc/logrotate.conf
+      register: logrotate_test
+      changed_when: false
+      failed_when: false
+
+    - name: Display logrotate test summary
+      ansible.builtin.debug:
+        msg: "logrotate config test completed on {{ inventory_hostname }} (debug output suppressed — check manually if needed)"
+
+    # ------------------------------------------------------------------
+    # Report current journal disk usage
+    # ------------------------------------------------------------------
+    - name: Check journald disk usage
+      ansible.builtin.command: journalctl --disk-usage
+      register: journal_disk_usage
+      changed_when: false
+      failed_when: false
+
+    - name: Display journald disk usage
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} journald: {{ journal_disk_usage.stdout }}"

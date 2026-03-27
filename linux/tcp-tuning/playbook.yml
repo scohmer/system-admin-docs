@@ -1,0 +1,71 @@
+---
+- name: TCP/IP Network Tuning
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  vars:
+    tcp_profiles:
+      web_server:
+        net.core.somaxconn: "65535"
+        net.core.netdev_max_backlog: "65535"
+        net.ipv4.tcp_max_syn_backlog: "65535"
+        net.ipv4.tcp_max_tw_buckets: "2000000"
+        net.ipv4.tcp_tw_reuse: "1"
+        net.ipv4.tcp_fin_timeout: "10"
+        net.ipv4.tcp_slow_start_after_idle: "0"
+        net.ipv4.tcp_keepalive_time: "60"
+        net.ipv4.tcp_keepalive_intvl: "10"
+        net.ipv4.tcp_keepalive_probes: "6"
+        net.core.rmem_max: "134217728"
+        net.core.wmem_max: "134217728"
+        net.ipv4.tcp_rmem: "4096 87380 134217728"
+        net.ipv4.tcp_wmem: "4096 65536 134217728"
+        net.ipv4.tcp_congestion_control: "bbr"
+        net.core.default_qdisc: "fq"
+      database:
+        net.ipv4.tcp_fin_timeout: "15"
+        net.ipv4.tcp_keepalive_time: "300"
+        net.ipv4.tcp_keepalive_intvl: "30"
+        net.ipv4.tcp_keepalive_probes: "5"
+        net.ipv4.tcp_tw_reuse: "1"
+        net.core.somaxconn: "4096"
+        net.ipv4.tcp_max_syn_backlog: "4096"
+        vm.swappiness: "10"
+      storage:
+        net.core.rmem_max: "268435456"
+        net.core.wmem_max: "268435456"
+        net.ipv4.tcp_rmem: "4096 87380 268435456"
+        net.ipv4.tcp_wmem: "4096 65536 268435456"
+        net.core.netdev_max_backlog: "300000"
+        net.ipv4.tcp_no_metrics_save: "1"
+        net.ipv4.tcp_low_latency: "1"
+
+  tasks:
+    - name: Apply TCP tuning profile
+      ansible.posix.sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        sysctl_file: /etc/sysctl.d/99-tcp-tuning.conf
+        state: present
+        reload: true
+      loop: "{{ (tcp_profiles[tcp_tuning_profile] | default({})).items() | list }}"
+      when: tcp_tuning_profile != 'custom'
+
+    - name: Apply custom TCP parameters
+      ansible.posix.sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        sysctl_file: /etc/sysctl.d/99-tcp-tuning.conf
+        state: present
+        reload: true
+      loop: "{{ tcp_custom_params | dict2items }}"
+      when:
+        - tcp_tuning_profile == 'custom'
+        - tcp_custom_params | length > 0
+
+    - name: Display applied tuning profile
+      ansible.builtin.debug:
+        msg: "Applied TCP tuning profile: {{ tcp_tuning_profile }}"

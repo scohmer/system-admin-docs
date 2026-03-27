@@ -1,0 +1,29 @@
+---
+target_hosts: all
+
+# MySQL root password — MUST be encrypted with Ansible Vault in production
+# ansible-vault encrypt_string 'YourPassword123!' --name 'mysql_root_password'
+mysql_root_password: "ChangeMe_UseVault!"
+
+# Bind address: 127.0.0.1 = local only, 0.0.0.0 = all interfaces
+mysql_bind_address: "127.0.0.1"
+
+# Open MySQL port 3306 in firewall (only if bind is not localhost)
+mysql_firewall_manage: false
+
+# Databases to create
+mysql_databases:
+  - name: appdb
+    encoding: utf8mb4
+    collation: utf8mb4_unicode_ci
+  # - name: reporting
+
+# MySQL users to create
+# priv format: "database.table:PRIVILEGE,PRIVILEGE" or "*.*:ALL"
+mysql_users: []
+  # - name: appuser
+  #   host: localhost
+  #   password: !vault |
+  #     $ANSIBLE_VAULT;1.1;AES256
+  #     ...
+  #   priv: "appdb.*:ALL"

@@ -1,0 +1,41 @@
+# Managed by Ansible — do not edit manually
+
+{% if keepalived_track_scripts | length > 0 %}
+{% for script in keepalived_track_scripts %}
+vrrp_script {{ script.name }} {
+    script "{{ script.script }}"
+    interval {{ script.interval | default(2) }}
+    weight {{ script.weight | default(2) }}
+}
+
+{% endfor %}
+{% endif %}
+{% for vrrp in keepalived_vrrp_instances %}
+vrrp_instance {{ vrrp.name }} {
+    state {{ vrrp.state }}
+    interface {{ vrrp.interface }}
+    virtual_router_id {{ vrrp.virtual_router_id }}
+    priority {{ vrrp.priority }}
+    advert_int {{ vrrp.advert_int | default(1) }}
+
+    authentication {
+        auth_type PASS
+        auth_pass {{ vrrp.auth_pass }}
+    }
+
+    virtual_ipaddresses {
+{% for vip in vrrp.virtual_ipaddresses %}
+        {{ vip }}
+{% endfor %}
+    }
+{% if vrrp.track_scripts is defined and vrrp.track_scripts | length > 0 %}
+
+    track_script {
+{% for ts in vrrp.track_scripts %}
+        {{ ts }}
+{% endfor %}
+    }
+{% endif %}
+}
+
+{% endfor %}

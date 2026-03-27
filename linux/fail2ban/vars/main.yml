@@ -1,0 +1,36 @@
+---
+target_hosts: all
+
+# Global fail2ban defaults
+fail2ban_bantime: 3600      # seconds (use -1 for permanent bans)
+fail2ban_findtime: 600       # time window in seconds
+fail2ban_maxretry: 5         # failures before ban
+
+# IPs/CIDRs that will never be banned
+fail2ban_ignoreips:
+  - "127.0.0.1/8"
+  - "::1"
+  # - "192.168.1.0/24"   # add your management network
+
+# Email for notifications (leave empty to disable)
+fail2ban_email: ""
+
+# Jail definitions
+fail2ban_jails:
+  - name: sshd
+    enabled: true
+    port: ssh
+    logpath: "%(sshd_log)s"
+    backend: "%(sshd_backend)s"
+    maxretry: 3
+    bantime: 3600
+
+  # - name: nginx-http-auth
+  #   enabled: false
+  #   port: http,https
+  #   logpath: /var/log/nginx/error.log
+
+  # - name: apache-auth
+  #   enabled: false
+  #   port: http,https
+  #   logpath: /var/log/apache2/error.log

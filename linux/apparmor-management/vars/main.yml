@@ -1,0 +1,19 @@
+---
+target_hosts: all
+
+# Profiles to set to enforce mode (full path or profile name)
+apparmor_profiles_enforce:
+  - /usr/sbin/sshd
+  # - /usr/sbin/nginx
+
+# Profiles to set to complain mode (log violations, don't block)
+apparmor_profiles_complain: []
+  # - /usr/bin/python3
+
+# Profiles to disable entirely
+apparmor_profiles_disable: []
+  # - /usr/sbin/tcpdump
+
+# Additional AppArmor packages to install
+apparmor_extra_packages: []
+  # - apparmor-notify

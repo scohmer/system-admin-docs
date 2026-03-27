@@ -1,0 +1,44 @@
+# Nginx virtual host: {{ item.name }}
+# Managed by Ansible (linux/nginx-management) — do not edit manually.
+
+server {
+    listen {{ item.listen_port | default(80) }};
+{% if item.ssl_enabled | default(false) %}
+    listen 443 ssl;
+    ssl_certificate     {{ item.ssl_cert }};
+    ssl_certificate_key {{ item.ssl_key }};
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+{% endif %}
+
+    server_name {{ item.server_name }};
+
+{% if item.root is defined %}
+    root  {{ item.root }};
+    index {{ item.index | default('index.html index.htm') }};
+{% endif %}
+
+    # Security headers
+    add_header X-Frame-Options SAMEORIGIN;
+    add_header X-Content-Type-Options nosniff;
+    add_header X-XSS-Protection "1; mode=block";
+
+    access_log /var/log/nginx/{{ item.name }}_access.log;
+    error_log  /var/log/nginx/{{ item.name }}_error.log;
+
+{% if item.proxy_pass is defined %}
+    location / {
+        proxy_pass {{ item.proxy_pass }};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+{% elif item.extra_config is defined %}
+    {{ item.extra_config | indent(4) }}
+{% else %}
+    location / {
+        try_files $uri $uri/ =404;
+    }
+{% endif %}
+}

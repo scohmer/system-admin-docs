@@ -1,0 +1,27 @@
+#!/bin/bash
+# rsync backup: {{ item.name }} — managed by Ansible (linux/rsync-backup)
+set -euo pipefail
+
+SRC="{{ item.src }}"
+DEST="{{ item.dest }}"
+LOG="{{ rsync_log_dir }}/{{ item.name }}.log"
+TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+
+echo "[$TIMESTAMP] Starting backup: {{ item.name }}"
+echo "[$TIMESTAMP] Source: $SRC"
+echo "[$TIMESTAMP] Destination: $DEST"
+
+RSYNC_OPTS="{{ item.options | default('-avz --delete') }}"
+{% if item.ssh_key is defined %}
+RSYNC_OPTS="$RSYNC_OPTS -e 'ssh -i {{ item.ssh_key }} -o StrictHostKeyChecking=no'"
+{% endif %}
+
+{% if item.exclude is defined and item.exclude | length > 0 %}
+{% for pattern in item.exclude %}
+RSYNC_OPTS="$RSYNC_OPTS --exclude='{{ pattern }}'"
+{% endfor %}
+{% endif %}
+
+eval rsync $RSYNC_OPTS "$SRC" "$DEST"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Backup completed successfully: {{ item.name }}"

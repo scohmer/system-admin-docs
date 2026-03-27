@@ -1,0 +1,103 @@
+---
+- name: PostgreSQL Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Install PostgreSQL (Debian)
+      ansible.builtin.apt:
+        name:
+          - "postgresql-{{ postgresql_version }}"
+          - python3-psycopg2
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install PostgreSQL (RedHat)
+      ansible.builtin.dnf:
+        name:
+          - "postgresql{{ postgresql_version }}-server"
+          - python3-psycopg2
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Initialize PostgreSQL database cluster (RedHat)
+      ansible.builtin.command: "/usr/pgsql-{{ postgresql_version }}/bin/postgresql-{{ postgresql_version }}-setup initdb"
+      args:
+        creates: "/var/lib/pgsql/{{ postgresql_version }}/data/PG_VERSION"
+      when: ansible_os_family == "RedHat"
+
+    - name: Enable and start PostgreSQL
+      ansible.builtin.systemd:
+        name: "{{ 'postgresql' if ansible_os_family == 'Debian' else 'postgresql-' + postgresql_version | string }}"
+        enabled: true
+        state: started
+
+    - name: Set PostgreSQL listen_addresses
+      community.postgresql.postgresql_set:
+        name: listen_addresses
+        value: "{{ postgresql_listen_addresses }}"
+        login_unix_socket: /var/run/postgresql
+      become_user: postgres
+      notify: Restart PostgreSQL
+
+    - name: Configure pg_hba.conf entries
+      community.postgresql.postgresql_pg_hba:
+        dest: "/etc/postgresql/{{ postgresql_version }}/main/pg_hba.conf"
+        contype: "{{ item.contype }}"
+        users: "{{ item.users | default('all') }}"
+        databases: "{{ item.databases | default('all') }}"
+        address: "{{ item.address | default('') }}"
+        method: "{{ item.method | default('md5') }}"
+        state: present
+      loop: "{{ postgresql_hba_entries }}"
+      when: postgresql_hba_entries | length > 0
+      notify: Reload PostgreSQL
+
+    - name: Create PostgreSQL databases
+      community.postgresql.postgresql_db:
+        name: "{{ item.name }}"
+        owner: "{{ item.owner | default('postgres') }}"
+        encoding: "{{ item.encoding | default('UTF8') }}"
+        state: present
+        login_unix_socket: /var/run/postgresql
+      become_user: postgres
+      loop: "{{ postgresql_databases }}"
+      when: postgresql_databases | length > 0
+
+    - name: Create PostgreSQL roles
+      community.postgresql.postgresql_user:
+        name: "{{ item.name }}"
+        password: "{{ item.password | default(omit) }}"
+        role_attr_flags: "{{ item.role_attr_flags | default('LOGIN') }}"
+        state: present
+        login_unix_socket: /var/run/postgresql
+      become_user: postgres
+      loop: "{{ postgresql_roles }}"
+      when: postgresql_roles | length > 0
+      no_log: true
+
+    - name: Grant database privileges to roles
+      community.postgresql.postgresql_privs:
+        db: "{{ item.database }}"
+        role: "{{ item.role }}"
+        type: database
+        privs: "{{ item.privs | default('ALL') }}"
+        login_unix_socket: /var/run/postgresql
+      become_user: postgres
+      loop: "{{ postgresql_roles | selectattr('database', 'defined') | list }}"
+      when: postgresql_roles | length > 0
+
+  handlers:
+    - name: Restart PostgreSQL
+      ansible.builtin.systemd:
+        name: "{{ 'postgresql' if ansible_os_family == 'Debian' else 'postgresql-' + postgresql_version | string }}"
+        state: restarted
+
+    - name: Reload PostgreSQL
+      ansible.builtin.systemd:
+        name: "{{ 'postgresql' if ansible_os_family == 'Debian' else 'postgresql-' + postgresql_version | string }}"
+        state: reloaded

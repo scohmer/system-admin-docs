@@ -1,0 +1,7 @@
+# /etc/exports — managed by Ansible (linux/nfs-server)
+# Do not edit manually — changes will be overwritten.
+# Generated: {{ ansible_date_time.iso8601 }}
+
+{% for export in nfs_exports %}
+{{ export.path }}  {{ export.clients }}
+{% endfor %}

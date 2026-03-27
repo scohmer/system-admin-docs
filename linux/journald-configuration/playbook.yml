@@ -1,0 +1,42 @@
+---
+- name: Journald Configuration
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Create persistent journal directory
+      ansible.builtin.file:
+        path: /var/log/journal
+        state: directory
+        owner: root
+        group: systemd-journal
+        mode: '2755'
+      when: journald_storage == 'persistent'
+
+    - name: Deploy journald.conf
+      ansible.builtin.template:
+        src: journald.conf.j2
+        dest: /etc/systemd/journald.conf
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      notify: Restart journald
+
+    - name: Show current journal disk usage
+      ansible.builtin.command: journalctl --disk-usage
+      register: journal_usage
+      changed_when: false
+
+    - name: Display journal disk usage
+      ansible.builtin.debug:
+        var: journal_usage.stdout_lines
+
+  handlers:
+    - name: Restart journald
+      ansible.builtin.systemd:
+        name: systemd-journald
+        state: restarted

@@ -1,0 +1,87 @@
+---
+# =============================================================================
+# Playbook: User Management
+# Description: Create, modify, and remove Linux users and groups.
+# Variables:   vars/main.yml
+# See README.md for variable documentation and usage.
+# =============================================================================
+
+- name: Linux User Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: false
+
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+
+    # ------------------------------------------------------------------
+    # Ensure required groups exist
+    # ------------------------------------------------------------------
+    - name: Create required groups
+      ansible.builtin.group:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ groups_to_create | default([]) }}"
+      loop_control:
+        label: "{{ item }}"
+
+    # ------------------------------------------------------------------
+    # Create or update users
+    # ------------------------------------------------------------------
+    - name: Create or update user accounts
+      ansible.builtin.user:
+        name: "{{ item.username }}"
+        comment: "{{ item.full_name | default('') }}"
+        groups: "{{ item.groups | default([]) }}"
+        append: true           # Append to groups rather than replace
+        shell: "{{ item.shell | default('/bin/bash') }}"
+        create_home: "{{ item.create_home | default(true) }}"
+        password_lock: "{{ item.password_lock | default(false) }}"
+        state: "{{ item.state | default('present') }}"
+      loop: "{{ users_to_create | default([]) }}"
+      loop_control:
+        label: "{{ item.username }}"
+
+    # ------------------------------------------------------------------
+    # Add SSH public keys for users that have one defined
+    # ------------------------------------------------------------------
+    - name: Add SSH authorized keys
+      ansible.posix.authorized_key:
+        user: "{{ item.username }}"
+        key: "{{ item.ssh_public_key }}"
+        state: present
+        exclusive: false       # Do not remove other existing keys
+      loop: "{{ users_to_create | default([]) }}"
+      loop_control:
+        label: "{{ item.username }}"
+      when:
+        - item.ssh_public_key is defined
+        - item.state | default('present') == 'present'
+
+    # ------------------------------------------------------------------
+    # Remove users
+    # ------------------------------------------------------------------
+    - name: Remove user accounts
+      ansible.builtin.user:
+        name: "{{ item.username }}"
+        state: absent
+        remove: "{{ item.remove_home | default(false) }}"
+      loop: "{{ users_to_remove | default([]) }}"
+      loop_control:
+        label: "{{ item.username }}"
+
+    # ------------------------------------------------------------------
+    # Summary report
+    # ------------------------------------------------------------------
+    - name: Report user status
+      ansible.builtin.shell: |
+        echo "=== Current users with login shells ==="
+        getent passwd | awk -F: '$7 ~ /bash|sh|zsh|fish/ {print $1, $5, $7}' | column -t
+      register: user_report
+      changed_when: false
+
+    - name: Display user report
+      ansible.builtin.debug:
+        msg: "{{ user_report.stdout_lines }}"

@@ -1,0 +1,38 @@
+---
+target_hosts: all
+
+rsync_log_dir: /var/log/rsync-backup
+
+# Backup job definitions
+rsync_backup_jobs:
+  - name: home-backup
+    src: /home/
+    dest: /mnt/backup/home/
+    options: "-avz --delete"
+    schedule:
+      minute: "0"
+      hour: "2"
+    exclude:
+      - "*.cache"
+      - ".Trash-*"
+
+  # Remote backup example:
+  # - name: data-remote
+  #   src: /srv/data/
+  #   dest: "backup@backup-server.corp.local:/backups/server01/data/"
+  #   ssh_key: /root/.ssh/backup_id_ed25519
+  #   options: "-avz --delete --compress"
+  #   schedule:
+  #     minute: "30"
+  #     hour: "1"
+
+  # Incremental backup with link-dest (versioned):
+  # - name: etc-versioned
+  #   src: /etc/
+  #   dest: "/mnt/backup/etc/$(date +%Y-%m-%d)/"
+  #   options: >-
+  #     -avz
+  #     --link-dest=/mnt/backup/etc/latest/
+  #   schedule:
+  #     minute: "0"
+  #     hour: "0"

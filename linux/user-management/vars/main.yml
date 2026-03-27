@@ -1,0 +1,34 @@
+---
+# =============================================================================
+# User Management Variables
+# Populate these variables before running the playbook.
+# See README.md for full documentation of each variable.
+# =============================================================================
+
+# Target hosts or group from your Ansible inventory
+target_hosts: all
+
+# Groups to ensure exist before creating users
+groups_to_create:
+  - developers
+  # - operations
+
+# Users to create or update
+users_to_create:
+  - username: example_user
+    full_name: Example User
+    groups:
+      - developers
+    shell: /bin/bash
+    create_home: true
+    # ssh_public_key: |
+    #   ssh-ed25519 AAAA... user@host
+    password_lock: false
+    state: present
+
+# Users to remove
+users_to_remove: []
+# Example:
+# users_to_remove:
+#   - username: olduser
+#     remove_home: true

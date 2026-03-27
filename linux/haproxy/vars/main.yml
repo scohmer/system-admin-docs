@@ -1,0 +1,44 @@
+target_hosts: all
+haproxy_firewall_manage: true
+
+haproxy_global:
+  log: "127.0.0.1 local0"
+  maxconn: 50000
+  user: haproxy
+  group: haproxy
+  daemon: true
+
+haproxy_defaults:
+  mode: http
+  timeout_connect: "5s"
+  timeout_client: "50s"
+  timeout_server: "50s"
+  option_httplog: true
+  option_dontlognull: true
+  option_forwardfor: true
+  option_http_server_close: true
+
+haproxy_frontends:
+  - name: http_front
+    bind: "*:80"
+    default_backend: http_back
+    # - name: https_front
+    #   bind: "*:443 ssl crt /etc/ssl/certs/haproxy.pem"
+    #   default_backend: http_back
+
+haproxy_backends:
+  - name: http_back
+    balance: roundrobin
+    servers:
+      - name: web01
+        address: "192.168.1.10:80"
+        options: "check"
+      - name: web02
+        address: "192.168.1.11:80"
+        options: "check"
+
+haproxy_stats_enable: true
+haproxy_stats_port: 8404
+haproxy_stats_uri: "/stats"
+haproxy_stats_user: admin
+haproxy_stats_password: "changeme"

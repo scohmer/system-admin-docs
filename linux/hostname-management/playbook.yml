@@ -1,0 +1,52 @@
+---
+- name: Hostname Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Set hostname via systemd
+      ansible.builtin.hostname:
+        name: "{{ hostname_fqdn }}"
+        use: systemd
+
+    - name: Update /etc/hostname
+      ansible.builtin.copy:
+        content: "{{ hostname_fqdn }}\n"
+        dest: /etc/hostname
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Remove old hostname entry from /etc/hosts
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: "^\\S+\\s+{{ ansible_hostname }}(\\s|$)"
+        state: absent
+        backup: true
+      when: hostname_update_hosts_file | bool
+
+    - name: Add/update FQDN entry in /etc/hosts
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: "^{{ hostname_ip }}"
+        line: "{{ hostname_ip }}\t{{ hostname_fqdn }}\t{{ hostname_short }}"
+        state: present
+      when: hostname_update_hosts_file | bool
+
+    - name: Verify hostname
+      ansible.builtin.command: hostnamectl status
+      register: hostnamectl_out
+      changed_when: false
+
+    - name: Display hostnamectl output
+      ansible.builtin.debug:
+        var: hostnamectl_out.stdout_lines
+
+    - name: Restart systemd-logind to pick up hostname change
+      ansible.builtin.systemd:
+        name: systemd-logind
+        state: restarted
+      when: hostname_restart_logind | bool

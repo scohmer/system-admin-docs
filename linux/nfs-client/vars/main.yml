@@ -1,0 +1,17 @@
+---
+target_hosts: all
+
+# NFS shares to mount on client systems
+# src: NFS server and export path
+# path: local mount point (created if not present)
+# opts: mount options
+# state: mounted | unmounted | absent
+nfs_mounts:
+  - src: "192.168.1.10:/exports/data"
+    path: /mnt/data
+    opts: "defaults,_netdev,hard,nfsvers=4"
+    state: mounted
+  # - src: "192.168.1.10:/exports/readonly"
+  #   path: /mnt/shared
+  #   opts: "ro,_netdev,soft,timeo=30"
+  #   state: mounted

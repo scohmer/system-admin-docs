@@ -1,0 +1,91 @@
+---
+# =============================================================================
+# Playbook: Network Configuration
+# Description: Configure network interfaces and hostname via NetworkManager.
+# Variables:   vars/main.yml
+# See README.md for variable documentation and safety notes.
+# =============================================================================
+
+- name: Linux Network Configuration
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+
+    # ------------------------------------------------------------------
+    # Set hostname
+    # ------------------------------------------------------------------
+    - name: Set system hostname
+      ansible.builtin.hostname:
+        name: "{{ hostname }}"
+        use: systemd
+      when: hostname | default('') | length > 0
+
+    - name: Update /etc/hosts with new hostname
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: '^127\.0\.1\.1\s'
+        line: "127.0.1.1 {{ hostname }}"
+        state: present
+      when: hostname | default('') | length > 0
+
+    # ------------------------------------------------------------------
+    # Verify NetworkManager is running
+    # ------------------------------------------------------------------
+    - name: Ensure NetworkManager is installed (Debian)
+      ansible.builtin.apt:
+        name: network-manager
+        state: present
+        update_cache: false
+      when: ansible_os_family == "Debian"
+
+    - name: Ensure NetworkManager is running
+      ansible.builtin.systemd:
+        name: NetworkManager
+        state: started
+        enabled: true
+
+    # ------------------------------------------------------------------
+    # Configure network interfaces
+    # ------------------------------------------------------------------
+    - name: Configure ethernet interfaces
+      community.general.nmcli:
+        conn_name: "{{ item.name }}"
+        ifname: "{{ item.name }}"
+        type: "{{ item.type | default('ethernet') }}"
+        ip4: "{{ item.address | default(omit) }}"
+        gw4: "{{ item.gateway | default(omit) }}"
+        dns4: "{{ item.dns | default(dns_servers | default(omit)) }}"
+        autoconnect: "{{ item.autoconnect | default(true) }}"
+        state: "{{ item.state | default('present') }}"
+        method4: "{{ 'manual' if item.address is defined else 'auto' }}"
+      loop: "{{ network_interfaces | default([]) }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    # ------------------------------------------------------------------
+    # Report network state
+    # ------------------------------------------------------------------
+    - name: Get current network configuration
+      ansible.builtin.command: nmcli device status
+      register: nmcli_status
+      changed_when: false
+      failed_when: false
+
+    - name: Display network interface status
+      ansible.builtin.debug:
+        msg: "{{ nmcli_status.stdout_lines }}"
+
+    - name: Get IP address summary
+      ansible.builtin.shell: |
+        ip -brief address show
+      register: ip_brief
+      changed_when: false
+
+    - name: Display IP addresses
+      ansible.builtin.debug:
+        msg: "{{ ip_brief.stdout_lines }}"

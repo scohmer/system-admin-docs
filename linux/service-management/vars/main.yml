@@ -1,0 +1,29 @@
+---
+# =============================================================================
+# Service Management Variables
+# Populate these variables before running the playbook.
+# See README.md for full documentation of each variable.
+# =============================================================================
+
+# Target hosts or group from your Ansible inventory
+target_hosts: all
+
+# Services to manage
+# state: started | stopped | restarted | reloaded
+# enabled: true | false  (whether to enable at boot)
+services:
+  - name: sshd
+    state: started
+    enabled: true
+
+  # - name: nginx
+  #   state: started
+  #   enabled: true
+
+  # - name: firewalld
+  #   state: started
+  #   enabled: true
+
+  # - name: postfix
+  #   state: stopped
+  #   enabled: false

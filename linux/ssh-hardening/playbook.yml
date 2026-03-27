@@ -1,0 +1,193 @@
+---
+# =============================================================================
+# Playbook: SSH Hardening
+# Description: Apply SSH daemon hardening best practices.
+# Variables:   vars/main.yml
+# See README.md for variable documentation and CRITICAL safety notes.
+# =============================================================================
+
+- name: Linux SSH Hardening
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: false
+
+  vars_files:
+    - vars/main.yml
+
+  handlers:
+    - name: Validate and restart sshd
+      ansible.builtin.shell: |
+        # Validate config before restarting — prevents locking out access
+        sshd -t && systemctl restart sshd
+      listen: restart sshd
+
+  tasks:
+
+    # ------------------------------------------------------------------
+    # SSH banner
+    # ------------------------------------------------------------------
+    - name: Write SSH logon banner
+      ansible.builtin.copy:
+        content: "{{ ssh_banner_message }}"
+        dest: /etc/issue.net
+        owner: root
+        group: root
+        mode: '0644'
+      when: ssh_banner_message | default('') | length > 0
+      notify: restart sshd
+
+    # ------------------------------------------------------------------
+    # sshd_config hardening
+    # ------------------------------------------------------------------
+    - name: Set SSH port
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?Port\s'
+        line: "Port {{ ssh_port | default(22) }}"
+        state: present
+        backup: true
+      notify: restart sshd
+
+    - name: Disable SSH protocol 1 (enforce protocol 2)
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?Protocol\s'
+        line: "Protocol 2"
+        state: present
+      notify: restart sshd
+
+    - name: Set PermitRootLogin
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PermitRootLogin\s'
+        line: "PermitRootLogin {{ ssh_permit_root_login | default('no') }}"
+        state: present
+      notify: restart sshd
+
+    - name: Set PasswordAuthentication
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PasswordAuthentication\s'
+        line: "PasswordAuthentication {{ ssh_password_authentication | default('no') }}"
+        state: present
+      notify: restart sshd
+
+    - name: Set PubkeyAuthentication
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PubkeyAuthentication\s'
+        line: "PubkeyAuthentication {{ ssh_pubkey_authentication | default('yes') }}"
+        state: present
+      notify: restart sshd
+
+    - name: Disable empty passwords
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PermitEmptyPasswords\s'
+        line: "PermitEmptyPasswords no"
+        state: present
+      notify: restart sshd
+
+    - name: Set MaxAuthTries
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?MaxAuthTries\s'
+        line: "MaxAuthTries {{ ssh_max_auth_tries | default(3) }}"
+        state: present
+      notify: restart sshd
+
+    - name: Set ClientAliveInterval
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?ClientAliveInterval\s'
+        line: "ClientAliveInterval {{ ssh_client_alive_interval | default(300) }}"
+        state: present
+      notify: restart sshd
+
+    - name: Set ClientAliveCountMax
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?ClientAliveCountMax\s'
+        line: "ClientAliveCountMax {{ ssh_client_alive_count_max | default(2) }}"
+        state: present
+      notify: restart sshd
+
+    - name: Disable X11 forwarding
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?X11Forwarding\s'
+        line: "X11Forwarding no"
+        state: present
+      notify: restart sshd
+
+    - name: Disable agent forwarding
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?AllowAgentForwarding\s'
+        line: "AllowAgentForwarding no"
+        state: present
+      notify: restart sshd
+
+    - name: Disable TCP forwarding
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?AllowTcpForwarding\s'
+        line: "AllowTcpForwarding no"
+        state: present
+      notify: restart sshd
+
+    - name: Enable banner in sshd_config
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?Banner\s'
+        line: "Banner /etc/issue.net"
+        state: present
+      when: ssh_banner_message | default('') | length > 0
+      notify: restart sshd
+
+    # ------------------------------------------------------------------
+    # Optional: restrict SSH access to specific users/groups
+    # ------------------------------------------------------------------
+    - name: Set AllowUsers restriction
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?AllowUsers\s'
+        line: "AllowUsers {{ ssh_allow_users | join(' ') }}"
+        state: present
+      when: ssh_allow_users | default([]) | length > 0
+      notify: restart sshd
+
+    - name: Remove AllowUsers if list is empty
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^AllowUsers\s'
+        state: absent
+      when: ssh_allow_users | default([]) | length == 0
+
+    - name: Set AllowGroups restriction
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?AllowGroups\s'
+        line: "AllowGroups {{ ssh_allow_groups | join(' ') }}"
+        state: present
+      when: ssh_allow_groups | default([]) | length > 0
+      notify: restart sshd
+
+    - name: Remove AllowGroups if list is empty
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^AllowGroups\s'
+        state: absent
+      when: ssh_allow_groups | default([]) | length == 0
+
+    # ------------------------------------------------------------------
+    # Validate config and report
+    # ------------------------------------------------------------------
+    - name: Validate sshd config (pre-flight check)
+      ansible.builtin.command: sshd -t
+      changed_when: false
+      register: sshd_validation
+
+    - name: Confirm config is valid
+      ansible.builtin.debug:
+        msg: "sshd configuration is valid on {{ inventory_hostname }}."

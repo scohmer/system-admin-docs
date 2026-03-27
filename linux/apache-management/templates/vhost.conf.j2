@@ -1,0 +1,36 @@
+# Apache virtual host: {{ item.name }}
+# Managed by Ansible (linux/apache-management) — do not edit manually.
+
+<VirtualHost *:{{ item.listen_port | default(80) }}>
+    ServerName {{ item.server_name }}
+{% if item.document_root is defined %}
+    DocumentRoot {{ item.document_root }}
+    <Directory {{ item.document_root }}>
+        Options -Indexes +FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+{% endif %}
+
+{% if item.ssl_enabled | default(false) %}
+    SSLEngine on
+    SSLCertificateFile    {{ item.ssl_cert }}
+    SSLCertificateKeyFile {{ item.ssl_key }}
+    SSLProtocol           all -SSLv3 -TLSv1 -TLSv1.1
+    SSLCipherSuite        HIGH:!aNULL:!MD5
+    Header always set Strict-Transport-Security "max-age=31536000"
+{% endif %}
+
+{% if item.proxy_pass is defined %}
+    ProxyPreserveHost On
+    ProxyPass        / {{ item.proxy_pass }}/
+    ProxyPassReverse / {{ item.proxy_pass }}/
+{% endif %}
+
+    # Security headers
+    Header always set X-Frame-Options SAMEORIGIN
+    Header always set X-Content-Type-Options nosniff
+
+    ErrorLog  ${APACHE_LOG_DIR}/{{ item.name }}_error.log
+    CustomLog ${APACHE_LOG_DIR}/{{ item.name }}_access.log combined
+</VirtualHost>

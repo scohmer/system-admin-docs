@@ -1,0 +1,25 @@
+---
+target_hosts: all
+
+keepalived_vrrp_instances:
+  - name: VI_1
+    state: MASTER          # MASTER or BACKUP
+    interface: eth0
+    virtual_router_id: 51  # must be same on MASTER and BACKUP, 1-255
+    priority: 100          # MASTER higher (e.g. 100), BACKUP lower (e.g. 90)
+    advert_int: 1
+    auth_pass: "changeme"  # max 8 chars
+    virtual_ipaddresses:
+      - "192.168.1.100/24 dev eth0"
+    # Optional: track scripts for health-based failover
+    # track_scripts:
+    #   - chk_haproxy
+
+# Optional health-check scripts
+keepalived_track_scripts: []
+  # - name: chk_haproxy
+  #   script: "killall -0 haproxy"
+  #   interval: 2
+  #   weight: 2
+
+keepalived_firewall_manage: true

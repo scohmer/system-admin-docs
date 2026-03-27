@@ -1,0 +1,35 @@
+---
+target_hosts: all
+
+dhcp_interface: eth0
+dhcp_domain_name: corp.local
+dhcp_dns_servers:
+  - 192.168.1.10
+  - 8.8.8.8
+dhcp_default_lease_time: 86400    # 24 hours
+dhcp_max_lease_time: 604800       # 7 days
+
+# Subnet definitions
+dhcp_subnets:
+  - network: 192.168.1.0
+    netmask: 255.255.255.0
+    range_start: 192.168.1.100
+    range_end: 192.168.1.200
+    gateway: 192.168.1.1
+    broadcast: 192.168.1.255
+
+  # - network: 10.10.0.0
+  #   netmask: 255.255.255.0
+  #   range_start: 10.10.0.50
+  #   range_end: 10.10.0.150
+  #   gateway: 10.10.0.1
+  #   broadcast: 10.10.0.255
+
+# Static IP reservations by MAC address
+dhcp_host_reservations: []
+  # - name: printer-lobby
+  #   mac: "aa:bb:cc:dd:ee:ff"
+  #   ip: 192.168.1.50
+  # - name: server01
+  #   mac: "11:22:33:44:55:66"
+  #   ip: 192.168.1.60

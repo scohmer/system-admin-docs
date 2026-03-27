@@ -1,0 +1,145 @@
+---
+- name: AIDE File Integrity Monitoring
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Install aide (Debian)
+      ansible.builtin.apt:
+        name: aide
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install aide (RedHat)
+      ansible.builtin.dnf:
+        name: aide
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Set OS-specific AIDE config path (Debian)
+      ansible.builtin.set_fact:
+        aide_conf_file: /etc/aide/aide.conf
+      when: ansible_os_family == "Debian"
+
+    - name: Set OS-specific AIDE config path (RedHat)
+      ansible.builtin.set_fact:
+        aide_conf_file: /etc/aide.conf
+      when: ansible_os_family == "RedHat"
+
+    - name: Create AIDE log directory
+      ansible.builtin.file:
+        path: /var/log/aide
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+
+    - name: Deploy aide.conf from template
+      ansible.builtin.template:
+        src: aide.conf.j2
+        dest: "{{ aide_conf_file }}"
+        owner: root
+        group: root
+        mode: '0600'
+        backup: true
+      notify: Reinitialize AIDE database
+      when: aide_reinitialize | bool
+
+    - name: Deploy aide.conf from template (no reinitialize)
+      ansible.builtin.template:
+        src: aide.conf.j2
+        dest: "{{ aide_conf_file }}"
+        owner: root
+        group: root
+        mode: '0600'
+        backup: true
+      when: not (aide_reinitialize | bool)
+
+    - name: Check if AIDE database exists
+      ansible.builtin.stat:
+        path: "{{ aide_db_path }}"
+      register: aide_db_stat
+
+    - name: Initialize AIDE database (first run or reinitialize)
+      ansible.builtin.command: "aide --init --config {{ aide_conf_file }}"
+      changed_when: true
+      when: not aide_db_stat.stat.exists or aide_reinitialize | bool
+      async: 600
+      poll: 15
+
+    - name: Move new AIDE database into place
+      ansible.builtin.command: "mv {{ aide_db_new_path }} {{ aide_db_path }}"
+      changed_when: true
+      when: not aide_db_stat.stat.exists or aide_reinitialize | bool
+
+    - name: Schedule daily AIDE check via cron
+      ansible.builtin.cron:
+        name: "AIDE integrity check"
+        hour: "{{ aide_cron_hour }}"
+        minute: "{{ aide_cron_minute }}"
+        job: >-
+          aide --check --config {{ aide_conf_file }} > {{ aide_report_path }} 2>&1{% if aide_email_enable %} && mail -s "AIDE Report $(hostname)" {{ aide_email_to }} < {{ aide_report_path }}{% endif %}
+        user: root
+        state: present
+      when: aide_schedule_method == 'cron'
+
+    - name: Deploy aide-check systemd service unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/aide-check.service
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=AIDE file integrity check
+          After=network.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/bin/aide --check --config {{ aide_conf_file }}
+          StandardOutput=append:{{ aide_report_path }}
+          StandardError=append:{{ aide_report_path }}
+      when: aide_schedule_method == 'systemd'
+      notify: Reload systemd daemon
+
+    - name: Deploy aide-check systemd timer unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/aide-check.timer
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Daily AIDE file integrity check
+
+          [Timer]
+          OnCalendar=*-*-* {{ aide_cron_hour }}:{{ aide_cron_minute }}:00
+          Persistent=true
+
+          [Install]
+          WantedBy=timers.target
+      when: aide_schedule_method == 'systemd'
+      notify: Reload systemd daemon
+
+    - name: Enable and start aide-check systemd timer
+      ansible.builtin.systemd:
+        name: aide-check.timer
+        enabled: true
+        state: started
+        daemon_reload: true
+      when: aide_schedule_method == 'systemd'
+
+  handlers:
+    - name: Reinitialize AIDE database
+      ansible.builtin.command: "aide --init --config {{ aide_conf_file }}"
+      changed_when: true
+      async: 600
+      poll: 15
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: true

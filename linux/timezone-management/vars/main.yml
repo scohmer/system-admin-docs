@@ -1,0 +1,9 @@
+---
+target_hosts: all
+
+# Timezone to configure (run 'timedatectl list-timezones' to see valid values)
+# Best practice: use UTC for servers
+system_timezone: UTC
+
+# Sync hardware clock after timezone change
+hwclock_sync: true

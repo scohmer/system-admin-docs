@@ -1,0 +1,102 @@
+---
+- name: LUKS Encryption Configuration
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Install cryptsetup (Debian)
+      ansible.builtin.apt:
+        name: cryptsetup
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install cryptsetup (RedHat)
+      ansible.builtin.dnf:
+        name: cryptsetup
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Create LUKS keyfile directory
+      ansible.builtin.file:
+        path: "{{ luks_keyfile_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+
+    - name: Check if device is already a LUKS device
+      ansible.builtin.command: "cryptsetup isLuks {{ item.device }}"
+      loop: "{{ luks_devices }}"
+      register: luks_check
+      changed_when: false
+      failed_when: false
+
+    - name: Initialize LUKS container
+      ansible.builtin.shell: "echo -n '{{ item.item.passphrase }}' | cryptsetup luksFormat --batch-mode --type luks2 {{ item.item.device }}"
+      loop: "{{ luks_check.results }}"
+      no_log: true
+      changed_when: true
+      when:
+        - item.item.initialize | bool
+        - item.rc != 0
+
+    - name: Check if mapped device already exists
+      ansible.builtin.stat:
+        path: "/dev/mapper/{{ item.name }}"
+      loop: "{{ luks_devices }}"
+      register: mapper_stat
+
+    - name: Open LUKS device
+      ansible.builtin.shell: "echo -n '{{ item.item.passphrase }}' | cryptsetup luksOpen {{ item.item.device }} {{ item.item.name }}"
+      loop: "{{ mapper_stat.results }}"
+      no_log: true
+      changed_when: true
+      when: not item.stat.exists
+
+    - name: Create filesystem on mapped device
+      ansible.builtin.command: "mkfs.{{ item.filesystem }} /dev/mapper/{{ item.name }}"
+      loop: "{{ luks_devices }}"
+      when: item.initialize | bool
+
+    - name: Add device to /etc/crypttab
+      ansible.builtin.lineinfile:
+        path: /etc/crypttab
+        line: "{{ item.name }}  {{ item.device }}  none  {{ item.crypttab_options }}"
+        regexp: "^{{ item.name }}\\s"
+        state: present
+        create: true
+        owner: root
+        group: root
+        mode: '0644'
+      loop: "{{ luks_devices }}"
+
+    - name: Create mount point directory
+      ansible.builtin.file:
+        path: "{{ item.mount_point }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop: "{{ luks_devices }}"
+
+    - name: Mount encrypted device
+      ansible.posix.mount:
+        path: "{{ item.mount_point }}"
+        src: "/dev/mapper/{{ item.name }}"
+        fstype: "{{ item.filesystem }}"
+        opts: "{{ item.mount_options }}"
+        state: mounted
+      loop: "{{ luks_devices }}"
+
+    - name: Warn about initialize flag
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: One or more devices were configured with 'initialize: true'.
+          This flag is destructive and will overwrite all existing data on the
+          target device. Set 'initialize: false' in vars/main.yml after the
+          first run to prevent accidental re-initialization on subsequent runs.
+      when: luks_devices | selectattr('initialize', 'equalto', true) | list | length > 0

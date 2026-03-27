@@ -1,0 +1,69 @@
+---
+- name: GRUB Bootloader Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  vars:
+    grub_config_file: /etc/default/grub
+    grub_update_cmd: "{{ 'update-grub' if ansible_os_family == 'Debian' else 'grub2-mkconfig -o /boot/grub2/grub.cfg' }}"
+
+  tasks:
+    - name: Backup /etc/default/grub
+      ansible.builtin.copy:
+        src: /etc/default/grub
+        dest: /etc/default/grub.bak
+        remote_src: true
+        force: false
+
+    - name: Set GRUB_TIMEOUT
+      ansible.builtin.lineinfile:
+        path: "{{ grub_config_file }}"
+        regexp: '^GRUB_TIMEOUT='
+        line: "GRUB_TIMEOUT={{ grub_timeout }}"
+        backup: true
+      notify: Update GRUB
+
+    - name: Set GRUB_DEFAULT
+      ansible.builtin.lineinfile:
+        path: "{{ grub_config_file }}"
+        regexp: '^GRUB_DEFAULT='
+        line: "GRUB_DEFAULT={{ grub_default }}"
+      notify: Update GRUB
+
+    - name: Read current GRUB_CMDLINE_LINUX_DEFAULT
+      ansible.builtin.command: grep '^GRUB_CMDLINE_LINUX_DEFAULT=' /etc/default/grub
+      register: grub_cmdline_current
+      changed_when: false
+
+    - name: Add kernel parameters to GRUB_CMDLINE_LINUX
+      ansible.builtin.lineinfile:
+        path: "{{ grub_config_file }}"
+        regexp: '^GRUB_CMDLINE_LINUX='
+        line: "GRUB_CMDLINE_LINUX=\"{{ grub_cmdline_add | join(' ') }}\""
+        backup: true
+      when: grub_cmdline_add | length > 0
+      notify: Update GRUB
+
+    - name: Configure GRUB password (security hardening)
+      ansible.builtin.template:
+        src: grub-password.cfg.j2
+        dest: /etc/grub.d/40_custom_password
+        owner: root
+        group: root
+        mode: '0755'
+      when:
+        - grub_password_enable | bool
+        - grub_password_hash != ''
+      notify: Update GRUB
+
+    - name: Warn about reboot requirement
+      ansible.builtin.debug:
+        msg: "GRUB configuration updated. A reboot is required for kernel parameter changes to take effect."
+
+  handlers:
+    - name: Update GRUB
+      ansible.builtin.command: "{{ grub_update_cmd }}"
+      changed_when: true

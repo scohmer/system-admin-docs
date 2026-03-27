@@ -1,0 +1,29 @@
+---
+target_hosts: all
+
+nginx_worker_processes: auto
+nginx_remove_default: true
+nginx_firewall_manage: true
+
+# Virtual host definitions
+nginx_vhosts:
+  - name: myapp
+    server_name: myapp.example.com
+    root: /var/www/myapp
+    index: index.html
+    listen_port: 80
+    ssl_enabled: false
+    # ssl_cert: /etc/ssl/certs/custom/myapp.crt
+    # ssl_key: /etc/ssl/certs/custom/myapp.key
+    extra_config: |
+      # Add custom location blocks or headers here
+      location / {
+          try_files $uri $uri/ =404;
+      }
+  # - name: api
+  #   server_name: api.example.com
+  #   listen_port: 443
+  #   ssl_enabled: true
+  #   ssl_cert: /etc/ssl/certs/custom/api.crt
+  #   ssl_key: /etc/ssl/certs/custom/api.key
+  #   proxy_pass: http://127.0.0.1:8080

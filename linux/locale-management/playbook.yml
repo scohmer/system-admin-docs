@@ -1,0 +1,56 @@
+---
+- name: Locale Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Generate required locales (Debian)
+      ansible.builtin.lineinfile:
+        path: /etc/locale.gen
+        regexp: "^#?{{ item | regex_escape }}"
+        line: "{{ item }}"
+        state: present
+      loop: "{{ locale_generate }}"
+      when: ansible_os_family == "Debian"
+      notify: Generate locales
+
+    - name: Install locale packages (RedHat)
+      ansible.builtin.dnf:
+        name: glibc-langpack-{{ system_locale.split('_')[0] }}
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Set system locale
+      community.general.locale_gen:
+        name: "{{ system_locale }}"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Configure system locale via localectl
+      ansible.builtin.command: >
+        localectl set-locale
+        LANG={{ system_locale }}
+        LC_ALL={{ system_locale }}
+      changed_when: true
+
+    - name: Set console keyboard layout
+      ansible.builtin.command: localectl set-keymap {{ locale_keyboard }}
+      when: locale_keyboard is defined
+      changed_when: true
+
+    - name: Verify locale setting
+      ansible.builtin.command: localectl status
+      register: locale_status
+      changed_when: false
+
+    - name: Display locale status
+      ansible.builtin.debug:
+        var: locale_status.stdout_lines
+
+  handlers:
+    - name: Generate locales
+      ansible.builtin.command: locale-gen
+      changed_when: true

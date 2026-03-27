@@ -1,0 +1,14 @@
+; Zone file: {{ item.name }} — managed by Ansible (linux/bind-dns)
+$TTL {{ item.ttl | default(3600) }}
+
+@ IN SOA {{ item.soa.ns }} {{ item.soa.email }} (
+    {{ item.soa.serial }}   ; Serial
+    {{ item.soa.refresh | default(3600) }}        ; Refresh
+    {{ item.soa.retry | default(900) }}         ; Retry
+    {{ item.soa.expire | default(604800) }}       ; Expire
+    {{ item.soa.minimum | default(3600) }}        ; Negative Cache TTL
+)
+
+{% for record in item.records %}
+{{ record.name }}    IN  {{ record.type }}    {{ record.value }}
+{% endfor %}

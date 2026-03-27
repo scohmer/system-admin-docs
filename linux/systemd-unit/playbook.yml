@@ -1,0 +1,33 @@
+---
+- name: Systemd Unit File Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Deploy systemd unit files
+      ansible.builtin.template:
+        src: service.unit.j2
+        dest: "/etc/systemd/system/{{ item.name }}.service"
+        owner: root
+        group: root
+        mode: '0644'
+      loop: "{{ systemd_units }}"
+      notify: Daemon reload
+
+    - name: Flush handlers (ensure daemon reload happens before managing services)
+      ansible.builtin.meta: flush_handlers
+
+    - name: Manage systemd service state and enabled status
+      ansible.builtin.systemd:
+        name: "{{ item.name }}.service"
+        state: "{{ item.state | default('started') }}"
+        enabled: "{{ item.enabled | default(true) }}"
+      loop: "{{ systemd_units }}"
+
+  handlers:
+    - name: Daemon reload
+      ansible.builtin.systemd:
+        daemon_reload: true

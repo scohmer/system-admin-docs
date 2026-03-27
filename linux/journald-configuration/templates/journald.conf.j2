@@ -1,0 +1,11 @@
+# /etc/systemd/journald.conf — managed by Ansible (linux/journald-configuration)
+[Journal]
+Storage={{ journald_storage }}
+Compress={{ 'yes' if journald_compress else 'no' }}
+SystemMaxUse={{ journald_system_max_use }}
+SystemKeepFree={{ journald_system_keep_free }}
+SystemMaxFileSize={{ journald_max_file_size }}
+MaxRetentionSec={{ journald_max_retention_sec }}
+ForwardToSyslog={{ 'yes' if journald_forward_to_syslog else 'no' }}
+RateLimitIntervalSec={{ journald_rate_limit_interval }}
+RateLimitBurst={{ journald_rate_limit_burst }}

@@ -1,0 +1,12 @@
+# /etc/security/faillock.conf — managed by Ansible (linux/account-lockout)
+# pam_faillock configuration
+
+deny = {{ faillock_deny }}
+fail_interval = {{ faillock_fail_interval }}
+unlock_time = {{ faillock_unlock_time }}
+{% if faillock_even_deny_root %}
+even_deny_root
+root_unlock_time = {{ faillock_root_unlock_time }}
+{% endif %}
+audit
+silent

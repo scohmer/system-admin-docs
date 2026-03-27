@@ -1,0 +1,22 @@
+---
+target_hosts: all
+
+redis_bind: "127.0.0.1"        # Use 0.0.0.0 to allow remote connections
+redis_port: 6379
+redis_password: ""             # Leave empty to disable auth (use ansible-vault if set)
+redis_maxmemory: "256mb"
+redis_maxmemory_policy: "allkeys-lru"
+
+# Persistence
+redis_save_enabled: true
+redis_save_intervals:
+  - "900 1"     # Save after 900s if at least 1 key changed
+  - "300 10"    # Save after 300s if at least 10 keys changed
+  - "60 10000"  # Save after 60s if at least 10000 keys changed
+
+redis_appendonly: false          # AOF persistence
+redis_loglevel: "notice"        # debug, verbose, notice, warning
+redis_logfile: "/var/log/redis/redis-server.log"
+redis_databases: 16
+
+redis_firewall_manage: false    # Default false — Redis should not be exposed by default

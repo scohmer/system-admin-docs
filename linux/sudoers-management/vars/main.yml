@@ -1,0 +1,50 @@
+---
+# =============================================================================
+# Variables: sudoers-management
+# Description: Define sudo access for users and groups via drop-in files.
+#              Use ansible-vault to protect sensitive data if needed.
+# =============================================================================
+
+# Target hosts - Ansible host pattern (default: all)
+target_hosts: all
+
+# ---------------------------------------------------------------------------
+# sudo_users: List of users to grant sudo access
+# ---------------------------------------------------------------------------
+# Each entry supports:
+#   username  (string, required) - Linux username
+#   nopasswd  (bool, optional, default: false) - NOPASSWD flag
+#   commands  (string, optional, default: ALL) - allowed commands
+# ---------------------------------------------------------------------------
+sudo_users: []
+# Example:
+# sudo_users:
+#   - username: deploy
+#     nopasswd: true
+#     commands: ALL
+#   - username: auditor
+#     nopasswd: false
+#     commands: /usr/bin/journalctl, /usr/bin/systemctl status *
+
+# ---------------------------------------------------------------------------
+# sudo_groups: List of groups to grant sudo access
+# ---------------------------------------------------------------------------
+# Each entry supports:
+#   groupname  (string, required) - Linux group name (without %)
+#   nopasswd   (bool, optional, default: false) - NOPASSWD flag
+#   commands   (string, optional, default: ALL) - allowed commands
+# ---------------------------------------------------------------------------
+sudo_groups: []
+# Example:
+# sudo_groups:
+#   - groupname: sysadmins
+#     nopasswd: false
+#     commands: ALL
+#   - groupname: developers
+#     nopasswd: true
+#     commands: /usr/bin/systemctl restart app*, /usr/bin/journalctl
+
+# ---------------------------------------------------------------------------
+# sudoers_validate: Run visudo -c validation on each drop-in file
+# ---------------------------------------------------------------------------
+sudoers_validate: true

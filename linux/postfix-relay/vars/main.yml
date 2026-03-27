@@ -1,0 +1,21 @@
+---
+target_hosts: all
+
+postfix_myhostname: "{{ ansible_fqdn }}"
+postfix_mydomain: corp.local
+
+# Relay host in Postfix format: [hostname]:port
+postfix_relayhost: "[smtp.corp.local]:587"
+
+# SASL authentication for relay (use Ansible Vault for password)
+postfix_relay_user: ""
+postfix_relay_password: ""    # !vault | $ANSIBLE_VAULT;...
+
+# Only accept mail from localhost (relay-only mode)
+postfix_inet_interfaces: loopback-only
+
+# Forward root mail to an admin address
+postfix_root_alias: "sysadmin@corp.local"
+
+# Accepted local domains
+postfix_mydestination: "$myhostname, localhost.$mydomain, localhost"

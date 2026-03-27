@@ -1,0 +1,143 @@
+---
+# =============================================================================
+# Playbook: Disk Management
+# Description: Report disk usage and manage LVM logical volumes.
+# Variables:   vars/main.yml
+# See README.md for variable documentation and usage.
+# =============================================================================
+
+- name: Linux Disk Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+
+    # ------------------------------------------------------------------
+    # Disk usage reporting
+    # ------------------------------------------------------------------
+    - name: Collect disk usage facts
+      ansible.builtin.shell: |
+        df -h --output=target,pcent,used,avail,fstype | tail -n +2
+      register: df_output
+      changed_when: false
+
+    - name: Display disk usage
+      ansible.builtin.debug:
+        msg: "{{ df_output.stdout_lines }}"
+
+    - name: Check for filesystems above warning threshold
+      ansible.builtin.shell: |
+        df --output=target,pcent | tail -n +2 | \
+          awk '{gsub(/%/,"",$2); if ($2 >= {{ disk_warning_threshold_pct }}) print $0}'
+      register: warning_filesystems
+      changed_when: false
+      failed_when: false
+
+    - name: Warn about high disk usage
+      ansible.builtin.debug:
+        msg: "WARNING: High disk usage (>={{ disk_warning_threshold_pct }}%) on {{ inventory_hostname }}: {{ item }}"
+      loop: "{{ warning_filesystems.stdout_lines }}"
+      when: warning_filesystems.stdout_lines | length > 0
+
+    - name: Check for filesystems above critical threshold
+      ansible.builtin.shell: |
+        df --output=target,pcent | tail -n +2 | \
+          awk '{gsub(/%/,"",$2); if ($2 >= {{ disk_critical_threshold_pct }}) print $0}'
+      register: critical_filesystems
+      changed_when: false
+      failed_when: false
+
+    - name: Alert on critical disk usage
+      ansible.builtin.debug:
+        msg: "CRITICAL: Disk usage >={{ disk_critical_threshold_pct }}% on {{ inventory_hostname }}: {{ item }} — immediate action required!"
+      loop: "{{ critical_filesystems.stdout_lines }}"
+      when: critical_filesystems.stdout_lines | length > 0
+
+    # ------------------------------------------------------------------
+    # LVM package prerequisite
+    # ------------------------------------------------------------------
+    - name: Ensure lvm2 is installed (Debian)
+      ansible.builtin.apt:
+        name: lvm2
+        state: present
+        update_cache: false
+      when:
+        - ansible_os_family == "Debian"
+        - lvm_volumes | default([]) | length > 0
+
+    - name: Ensure lvm2 is installed (RHEL)
+      ansible.builtin.dnf:
+        name: lvm2
+        state: present
+      when:
+        - ansible_os_family == "RedHat"
+        - lvm_volumes | default([]) | length > 0
+
+    # ------------------------------------------------------------------
+    # LVM logical volume management
+    # ------------------------------------------------------------------
+    - name: Create or resize logical volumes
+      community.general.lvol:
+        vg: "{{ item.vg }}"
+        lv: "{{ item.lv }}"
+        size: "{{ item.size }}"
+        state: "{{ item.state | default('present') }}"
+        resizefs: true    # Resize the filesystem when extending
+        force: false      # Never force-shrink (destructive)
+      loop: "{{ lvm_volumes | default([]) }}"
+      loop_control:
+        label: "{{ item.vg }}/{{ item.lv }}"
+      when: item.state | default('present') == 'present'
+
+    - name: Create filesystem on new logical volumes
+      community.general.filesystem:
+        fstype: "{{ item.filesystem | default('ext4') }}"
+        dev: "/dev/{{ item.vg }}/{{ item.lv }}"
+        resizefs: true
+      loop: "{{ lvm_volumes | default([]) }}"
+      loop_control:
+        label: "{{ item.vg }}/{{ item.lv }}"
+      when:
+        - item.state | default('present') == 'present'
+        - item.filesystem is defined
+
+    - name: Ensure mount points exist
+      ansible.builtin.file:
+        path: "{{ item.mount_point }}"
+        state: directory
+        mode: '0755'
+      loop: "{{ lvm_volumes | default([]) }}"
+      loop_control:
+        label: "{{ item.mount_point | default('no-mount') }}"
+      when:
+        - item.mount_point is defined
+        - item.state | default('present') == 'present'
+
+    - name: Mount logical volumes and persist in fstab
+      ansible.posix.mount:
+        path: "{{ item.mount_point }}"
+        src: "/dev/{{ item.vg }}/{{ item.lv }}"
+        fstype: "{{ item.filesystem | default('ext4') }}"
+        opts: "{{ item.mount_opts | default('defaults') }}"
+        state: mounted
+      loop: "{{ lvm_volumes | default([]) }}"
+      loop_control:
+        label: "{{ item.mount_point | default('no-mount') }}"
+      when:
+        - item.mount_point is defined
+        - item.state | default('present') == 'present'
+
+    - name: Remove logical volumes
+      community.general.lvol:
+        vg: "{{ item.vg }}"
+        lv: "{{ item.lv }}"
+        state: absent
+        force: false
+      loop: "{{ lvm_volumes | default([]) }}"
+      loop_control:
+        label: "{{ item.vg }}/{{ item.lv }}"
+      when: item.state | default('present') == 'absent'

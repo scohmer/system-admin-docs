@@ -1,0 +1,56 @@
+---
+- name: System Resource Limits (ulimits) Configuration
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Configure /etc/security/limits.conf entries
+      community.general.pam_limits:
+        domain: "{{ item.domain }}"
+        limit_type: "{{ item.type }}"
+        limit_item: "{{ item.item }}"
+        value: "{{ item.value }}"
+      loop: "{{ ulimits }}"
+      when: ulimits | length > 0
+
+    - name: Configure systemd DefaultLimitNOFILE (open files)
+      ansible.builtin.lineinfile:
+        path: /etc/systemd/system.conf
+        regexp: '^#?DefaultLimitNOFILE='
+        line: "DefaultLimitNOFILE={{ systemd_default_limits.nofile | default('65536') }}"
+        backup: true
+      when: systemd_default_limits.nofile is defined
+      notify: Reload systemd
+
+    - name: Configure systemd DefaultLimitNPROC (processes)
+      ansible.builtin.lineinfile:
+        path: /etc/systemd/system.conf
+        regexp: '^#?DefaultLimitNPROC='
+        line: "DefaultLimitNPROC={{ systemd_default_limits.nproc }}"
+        backup: true
+      when: systemd_default_limits.nproc is defined
+      notify: Reload systemd
+
+    - name: Configure systemd DefaultLimitMEMLOCK (memory lock)
+      ansible.builtin.lineinfile:
+        path: /etc/systemd/system.conf
+        regexp: '^#?DefaultLimitMEMLOCK='
+        line: "DefaultLimitMEMLOCK={{ systemd_default_limits.memlock }}"
+        backup: true
+      when: systemd_default_limits.memlock is defined
+      notify: Reload systemd
+
+    - name: Ensure pam_limits is enabled in /etc/pam.d/common-session (Debian)
+      ansible.builtin.lineinfile:
+        path: /etc/pam.d/common-session
+        line: "session required pam_limits.so"
+        state: present
+      when: ansible_os_family == "Debian"
+
+  handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true

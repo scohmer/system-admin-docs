@@ -1,0 +1,12 @@
+---
+target_hosts: all
+
+journald_storage: persistent         # auto | persistent | volatile | none
+journald_compress: true
+journald_system_max_use: 500M        # Max total journal disk space
+journald_system_keep_free: 1G        # Min free disk space to leave available
+journald_max_file_size: 50M          # Max size of each journal file
+journald_max_retention_sec: 0        # 0 = no time limit; use e.g. 2592000 for 30 days
+journald_forward_to_syslog: false
+journald_rate_limit_interval: 30s
+journald_rate_limit_burst: 10000

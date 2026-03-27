@@ -1,0 +1,62 @@
+---
+- name: YUM/DNF Repository Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Fail if not a RedHat-family system
+      ansible.builtin.fail:
+        msg: "This playbook is for RHEL/CentOS/Rocky Linux only. Use apt-repo-management for Debian/Ubuntu."
+      when: ansible_os_family != "RedHat"
+
+    - name: Install GPG keys
+      ansible.builtin.rpm_key:
+        key: "{{ item }}"
+        state: present
+      loop: "{{ gpg_keys }}"
+      when: gpg_keys | length > 0
+
+    - name: Add/update YUM/DNF repositories
+      ansible.builtin.yum_repository:
+        name: "{{ item.name }}"
+        description: "{{ item.description }}"
+        baseurl: "{{ item.baseurl | default(omit) }}"
+        mirrorlist: "{{ item.mirrorlist | default(omit) }}"
+        gpgcheck: "{{ item.gpgcheck | default(true) | int }}"
+        gpgkey: "{{ item.gpgkey | default(omit) }}"
+        enabled: "{{ item.enabled | default(true) | int }}"
+        priority: "{{ item.priority | default(omit) }}"
+        state: present
+      loop: "{{ yum_repos }}"
+      when: yum_repos | length > 0
+
+    - name: Disable specified repositories
+      ansible.builtin.yum_repository:
+        name: "{{ item }}"
+        state: present
+        enabled: false
+      loop: "{{ yum_repos_disable }}"
+      when: yum_repos_disable | length > 0
+
+    - name: Remove repositories
+      ansible.builtin.yum_repository:
+        name: "{{ item }}"
+        state: absent
+      loop: "{{ yum_repos_remove }}"
+      when: yum_repos_remove | length > 0
+
+    - name: Clean DNF/YUM cache
+      ansible.builtin.command: dnf clean all
+      changed_when: true
+
+    - name: List enabled repositories
+      ansible.builtin.command: dnf repolist enabled
+      register: repo_list
+      changed_when: false
+
+    - name: Display enabled repositories
+      ansible.builtin.debug:
+        var: repo_list.stdout_lines

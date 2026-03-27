@@ -1,0 +1,74 @@
+---
+- name: Password Policy Configuration
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Install pwquality (Debian)
+      ansible.builtin.apt:
+        name: libpam-pwquality
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install pwquality (RedHat)
+      ansible.builtin.dnf:
+        name: pam_pwquality
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    # ── login.defs: aging policy ─────────────────────────────────────────────
+    - name: Configure PASS_MAX_DAYS
+      ansible.builtin.lineinfile:
+        path: /etc/login.defs
+        regexp: '^PASS_MAX_DAYS'
+        line: "PASS_MAX_DAYS\t{{ password_max_age }}"
+        backup: true
+
+    - name: Configure PASS_MIN_DAYS
+      ansible.builtin.lineinfile:
+        path: /etc/login.defs
+        regexp: '^PASS_MIN_DAYS'
+        line: "PASS_MIN_DAYS\t{{ password_min_age }}"
+
+    - name: Configure PASS_WARN_AGE
+      ansible.builtin.lineinfile:
+        path: /etc/login.defs
+        regexp: '^PASS_WARN_AGE'
+        line: "PASS_WARN_AGE\t{{ password_warn_age }}"
+
+    - name: Configure PASS_MIN_LEN
+      ansible.builtin.lineinfile:
+        path: /etc/login.defs
+        regexp: '^PASS_MIN_LEN'
+        line: "PASS_MIN_LEN\t{{ password_min_length }}"
+
+    # ── pwquality.conf: complexity policy ────────────────────────────────────
+    - name: Configure /etc/security/pwquality.conf
+      ansible.builtin.template:
+        src: pwquality.conf.j2
+        dest: /etc/security/pwquality.conf
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+
+    # ── PAM: remember password history ──────────────────────────────────────
+    - name: Configure password history in PAM (Debian)
+      ansible.builtin.lineinfile:
+        path: /etc/pam.d/common-password
+        regexp: 'pam_unix.so'
+        line: "password\trequired\tpam_unix.so obscure use_authtok try_first_pass sha512 remember={{ password_remember }}"
+        backup: true
+      when: ansible_os_family == "Debian"
+
+    - name: Configure password history in PAM (RedHat)
+      ansible.builtin.lineinfile:
+        path: /etc/pam.d/system-auth
+        regexp: 'pam_unix.so.*remember'
+        line: "password\tsufficient\tpam_unix.so sha512 shadow nullok use_authtok remember={{ password_remember }}"
+        backup: true
+      when: ansible_os_family == "RedHat"

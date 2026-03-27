@@ -1,0 +1,21 @@
+---
+target_hosts: all
+
+# Email address for mdadm failure alerts (requires working MTA)
+raid_monitor_email: root
+
+# Schedule for RAID consistency check cron job
+raid_check_schedule:
+  minute: "0"
+  hour: "0"
+  weekday: "0"    # 0 = Sunday
+
+# RAID arrays to monitor (informational only — for documentation)
+# The playbook reads actual array state from /proc/mdstat
+raid_arrays: []
+  # - device: /dev/md0
+  #   level: 1
+  #   devices:
+  #     - /dev/sdb
+  #     - /dev/sdc
+  #   mount_point: /data

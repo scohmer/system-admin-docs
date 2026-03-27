@@ -1,0 +1,22 @@
+---
+target_hosts: all
+
+# Apply CIS security hardening baseline
+sysctl_apply_security_baseline: true
+
+# Custom sysctl parameters (appended after baseline)
+# key: sysctl parameter name
+# value: desired value (as string)
+sysctl_params: []
+  # Performance tuning examples:
+  # - key: vm.swappiness
+  #   value: "10"
+  # - key: net.core.somaxconn
+  #   value: "65535"
+  # - key: net.ipv4.tcp_max_syn_backlog
+  #   value: "65535"
+  # - key: fs.file-max
+  #   value: "2097152"
+  # Database server example (enable IP forward for containers):
+  # - key: net.ipv4.ip_forward
+  #   value: "1"

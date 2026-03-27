@@ -1,0 +1,17 @@
+---
+target_hosts: all
+
+# System-wide variables in /etc/environment (no shell syntax — plain key=value)
+env_system_vars:
+  TZ: UTC
+  LANG: en_US.UTF-8
+  # JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+
+# Variables in /etc/profile.d/ansible-env.sh (shell syntax — can use export, PATH)
+env_profile_vars:
+  # APP_HOME: /opt/myapp
+  # PATH_ADD: /opt/myapp/bin
+
+# Variable names to remove from /etc/environment
+env_remove_keys: []
+  # - OLD_VAR

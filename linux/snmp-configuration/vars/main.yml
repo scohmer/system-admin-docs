@@ -1,0 +1,28 @@
+---
+target_hosts: all
+
+# SNMPv2c community string — use Ansible Vault in production
+snmp_community: "public"
+
+snmp_location: "Data Center Rack A1"
+snmp_contact: "sysadmin@corp.local"
+
+# IPs/subnets allowed to query SNMP
+snmp_allowed_sources:
+  - "192.168.1.0/24"
+  # - "10.0.0.5"   # NMS server
+
+snmp_version: v2c    # v2c | v3 | both
+
+# SNMPv3 users (requires snmp_version: v3 or both)
+# Use Ansible Vault for passwords
+snmp_v3_users: []
+  # - username: monitoruser
+  #   auth_password: !vault | $ANSIBLE_VAULT;...
+  #   auth_protocol: SHA
+  #   priv_password: !vault | $ANSIBLE_VAULT;...
+  #   priv_protocol: AES
+
+# SNMP traps
+snmp_traps_enabled: false
+snmp_trap_sink: ""   # e.g., 192.168.1.100

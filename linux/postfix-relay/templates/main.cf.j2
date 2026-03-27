@@ -1,0 +1,33 @@
+# /etc/postfix/main.cf — managed by Ansible (linux/postfix-relay)
+
+myhostname = {{ postfix_myhostname }}
+mydomain = {{ postfix_mydomain }}
+myorigin = $mydomain
+mydestination = {{ postfix_mydestination }}
+inet_interfaces = {{ postfix_inet_interfaces }}
+inet_protocols = all
+
+{% if postfix_relayhost %}
+relayhost = {{ postfix_relayhost }}
+
+# SASL authentication
+smtp_sasl_auth_enable = yes
+smtp_sasl_security_options = noanonymous
+smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+
+# TLS
+smtp_use_tls = yes
+smtp_tls_security_level = may
+smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
+smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+{% endif %}
+
+# Local delivery
+home_mailbox = Maildir/
+mailbox_size_limit = 0
+recipient_delimiter = +
+
+# Hardening
+smtpd_banner = $myhostname ESMTP
+biff = no
+append_dot_mydomain = no

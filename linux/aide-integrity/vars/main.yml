@@ -1,0 +1,34 @@
+---
+target_hosts: all
+
+aide_db_path: /var/lib/aide/aide.db
+aide_db_new_path: /var/lib/aide/aide.db.new
+aide_config_path: /etc/aide/aide.conf   # Debian path; RedHat uses /etc/aide.conf
+aide_report_path: /var/log/aide/aide.log
+
+# Directories to include/exclude beyond defaults
+aide_extra_include: []
+  # - /opt
+  # - /srv
+
+aide_extra_exclude:
+  - /proc
+  - /sys
+  - /dev
+  - /run
+  - /tmp
+  - /var/log
+  - /var/cache
+  - /var/tmp
+
+# Schedule daily check via systemd timer (preferred) or cron
+aide_schedule_method: cron   # cron or systemd
+aide_cron_hour: "3"
+aide_cron_minute: "0"
+
+# Email alert on changes
+aide_email_enable: false
+aide_email_to: "root@localhost"
+
+# Re-initialize database (destructive: overwrites existing baseline)
+aide_reinitialize: false

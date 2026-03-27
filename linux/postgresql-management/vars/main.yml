@@ -1,0 +1,38 @@
+---
+target_hosts: all
+
+postgresql_version: "15"
+postgresql_listen_addresses: "localhost"
+
+# pg_hba.conf entries
+postgresql_hba_entries:
+  - contype: local
+    users: all
+    databases: all
+    method: peer
+  - contype: host
+    users: all
+    databases: all
+    address: "127.0.0.1/32"
+    method: md5
+  # - contype: host
+  #   users: appuser
+  #   databases: appdb
+  #   address: "192.168.1.0/24"
+  #   method: md5
+
+# Databases to create
+postgresql_databases:
+  - name: appdb
+    owner: appuser
+  # - name: analytics
+
+# Roles (users) to create
+postgresql_roles: []
+  # - name: appuser
+  #   password: !vault |
+  #     $ANSIBLE_VAULT;1.1;AES256
+  #     ...
+  #   role_attr_flags: "LOGIN,NOSUPERUSER,NOCREATEDB"
+  #   database: appdb
+  #   privs: ALL

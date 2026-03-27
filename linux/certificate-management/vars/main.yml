@@ -1,0 +1,27 @@
+---
+target_hosts: all
+
+# Base directory for deployed certificates
+cert_base_dir: /etc/ssl/certs/custom
+
+# Certificates to deploy
+# Use Ansible Vault to encrypt key_content values
+certificates: []
+  # - name: myserver
+  #   cert_content: |
+  #     -----BEGIN CERTIFICATE-----
+  #     ...
+  #     -----END CERTIFICATE-----
+  #   key_content: !vault |
+  #     $ANSIBLE_VAULT;1.1;AES256
+  #     ...
+  #   dest_cert: /etc/nginx/ssl/myserver.crt
+  #   dest_key: /etc/nginx/ssl/myserver.key
+
+# CA certificates to add to the system trust store
+ca_certificates: []
+  # - name: corp-root-ca
+  #   content: |
+  #     -----BEGIN CERTIFICATE-----
+  #     ...
+  #     -----END CERTIFICATE-----

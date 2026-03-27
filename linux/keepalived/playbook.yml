@@ -1,0 +1,77 @@
+---
+- name: Keepalived VRRP Configuration
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Install keepalived (Debian)
+      ansible.builtin.apt:
+        name: keepalived
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install keepalived (RedHat)
+      ansible.builtin.dnf:
+        name: keepalived
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Enable IP forwarding
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: "1"
+        sysctl_file: /etc/sysctl.d/99-keepalived.conf
+        state: present
+        reload: true
+
+    - name: Enable non-local IP binding
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_nonlocal_bind
+        value: "1"
+        sysctl_file: /etc/sysctl.d/99-keepalived.conf
+        state: present
+        reload: true
+
+    - name: Deploy keepalived configuration
+      ansible.builtin.template:
+        src: keepalived.conf.j2
+        dest: /etc/keepalived/keepalived.conf
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      notify: Restart keepalived
+
+    - name: Enable and start keepalived
+      ansible.builtin.systemd:
+        name: keepalived
+        enabled: true
+        state: started
+
+    - name: Allow VRRP protocol in firewalld (RedHat)
+      ansible.posix.firewalld:
+        rich_rule: 'rule protocol value="vrrp" accept'
+        permanent: true
+        state: enabled
+        immediate: true
+      when:
+        - ansible_os_family == "RedHat"
+        - keepalived_firewall_manage | bool
+
+    - name: Allow VRRP protocol in UFW (Debian)
+      community.general.ufw:
+        rule: allow
+        proto: vrrp
+      when:
+        - ansible_os_family == "Debian"
+        - keepalived_firewall_manage | bool
+
+  handlers:
+    - name: Restart keepalived
+      ansible.builtin.systemd:
+        name: keepalived
+        state: restarted

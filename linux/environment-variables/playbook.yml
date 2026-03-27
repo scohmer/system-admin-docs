@@ -1,0 +1,36 @@
+---
+- name: System Environment Variables Management
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Set system-wide environment variables in /etc/environment
+      ansible.builtin.lineinfile:
+        path: /etc/environment
+        regexp: "^{{ item.key }}="
+        line: '{{ item.key }}="{{ item.value }}"'
+        state: present
+        create: true
+        backup: true
+      loop: "{{ env_system_vars | dict2items }}"
+      when: env_system_vars | length > 0
+
+    - name: Remove environment variables from /etc/environment
+      ansible.builtin.lineinfile:
+        path: /etc/environment
+        regexp: "^{{ item }}="
+        state: absent
+      loop: "{{ env_remove_keys }}"
+      when: env_remove_keys | length > 0
+
+    - name: Deploy /etc/profile.d/ansible-env.sh
+      ansible.builtin.template:
+        src: ansible-env.sh.j2
+        dest: /etc/profile.d/ansible-env.sh
+        owner: root
+        group: root
+        mode: '0644'
+      when: env_profile_vars | length > 0

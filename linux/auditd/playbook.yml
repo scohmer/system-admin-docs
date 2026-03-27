@@ -1,0 +1,71 @@
+---
+- name: Auditd Configuration
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Install auditd (Debian)
+      ansible.builtin.apt:
+        name:
+          - auditd
+          - audispd-plugins
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install auditd (RedHat)
+      ansible.builtin.dnf:
+        name:
+          - audit
+          - audit-libs
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Configure auditd.conf
+      ansible.builtin.template:
+        src: auditd.conf.j2
+        dest: /etc/audit/auditd.conf
+        owner: root
+        group: root
+        mode: '0640'
+        backup: true
+      notify: Restart auditd
+
+    - name: Deploy CIS baseline audit rules
+      ansible.builtin.copy:
+        src: cis-rules.rules
+        dest: /etc/audit/rules.d/10-cis-baseline.rules
+        owner: root
+        group: root
+        mode: '0640'
+      when: auditd_use_cis_rules | bool
+      notify: Reload audit rules
+
+    - name: Deploy custom audit rules
+      ansible.builtin.template:
+        src: custom-rules.j2
+        dest: /etc/audit/rules.d/50-custom.rules
+        owner: root
+        group: root
+        mode: '0640'
+      when: auditd_rules | length > 0
+      notify: Reload audit rules
+
+    - name: Enable and start auditd
+      ansible.builtin.systemd:
+        name: auditd
+        enabled: true
+        state: started
+
+  handlers:
+    - name: Restart auditd
+      ansible.builtin.systemd:
+        name: auditd
+        state: restarted
+
+    - name: Reload audit rules
+      ansible.builtin.command: augenrules --load
+      changed_when: true

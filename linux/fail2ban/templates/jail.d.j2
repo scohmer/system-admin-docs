@@ -1,0 +1,11 @@
+# /etc/fail2ban/jail.d/{{ item.name }}.conf — managed by Ansible
+
+[{{ item.name }}]
+enabled  = {{ item.enabled | default(true) | string | lower }}
+port     = {{ item.port | default('ssh') }}
+logpath  = {{ item.logpath | default('%(sshd_log)s') }}
+{% if item.backend is defined %}
+backend  = {{ item.backend }}
+{% endif %}
+maxretry = {{ item.maxretry | default(fail2ban_maxretry) }}
+bantime  = {{ item.bantime | default(fail2ban_bantime) }}

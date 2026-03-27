@@ -1,0 +1,42 @@
+---
+- name: NFS Client Configuration
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Install NFS client (Debian)
+      ansible.builtin.apt:
+        name: nfs-common
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install NFS client (RedHat)
+      ansible.builtin.dnf:
+        name: nfs-utils
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Create mount point directories
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop: "{{ nfs_mounts }}"
+      when: item.state | default('mounted') != 'absent'
+
+    - name: Configure NFS mounts in /etc/fstab
+      ansible.posix.mount:
+        src: "{{ item.src }}"
+        path: "{{ item.path }}"
+        fstype: nfs
+        opts: "{{ item.opts | default('defaults,_netdev') }}"
+        state: "{{ item.state | default('mounted') }}"
+        dump: "{{ item.dump | default('0') }}"
+        passno: "{{ item.passno | default('0') }}"
+      loop: "{{ nfs_mounts }}"
