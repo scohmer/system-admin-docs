@@ -22,11 +22,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Write-Status {
-    param([string]$Message, [string]$Level = 'INFO')
-    $color = switch ($Level) { 'SUCCESS' { 'Green' }; 'WARN' { 'Yellow' }; 'ERROR' { 'Red' }; default { 'Cyan' } }
-    Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')][$Level] $Message" -ForegroundColor $color
-}
+. "$PSScriptRoot\..\shared\Write-Log.ps1"
+Initialize-Log -ScriptName 'Invoke-WindowsUpdates'
 
 # Verify PSWindowsUpdate is available
 if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) {
@@ -82,9 +79,11 @@ switch ($Action) {
     }
 
     'History' {
-        Write-Status "Retrieving Windows Update history (last 50 entries)..."
+        Write-Log "Retrieving Windows Update history (last 50 entries)..."
         Get-WUHistory -MaxDate (Get-Date) -Last 50 |
             Select-Object Date, KB, Title, Result |
             Format-Table -AutoSize -Wrap
     }
 }
+
+Close-Log

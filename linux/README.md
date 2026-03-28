@@ -103,14 +103,16 @@ Each task folder follows this layout:
 | [GRUB Management](grub-management/) | `playbook.yml` | Configure GRUB options and set boot password |
 | [SNMP Configuration](snmp-configuration/) | `playbook.yml` | Configure SNMPv2c/v3 for network monitoring |
 
-### Monitoring & Observability
+### Monitoring, Alerting & Observability
 
 | Task | Playbook | Description |
 |------|----------|-------------|
 | [Log Management](log-management/) | `playbook.yml` | Configure rsyslog forwarding and log rotation |
+| [Centralized Syslog](centralized-syslog/) | `playbook.yml` | Forward logs to a central rsyslog server; configure receiver |
 | [Journald Configuration](journald-configuration/) | `playbook.yml` | Configure systemd-journald retention and persistence |
 | [Node Exporter](node-exporter/) | `playbook.yml` | Deploy Prometheus Node Exporter for host metrics |
-| [Performance Monitoring](performance-monitoring/) | `playbook.yml` | Collect and report system performance metrics |
+| [Disk Space Monitor](disk-space-monitor/) | `playbook.yml` | Alert when filesystem usage exceeds warn/alert thresholds |
+| [Service Health Check](service-health-check/) | `playbook.yml` | Verify required services are running; optional auto-restart |
 
 ### System Configuration
 

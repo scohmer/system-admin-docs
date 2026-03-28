@@ -1,0 +1,113 @@
+---
+- name: Service Health Check
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Check each required service
+      ansible.builtin.command: systemctl is-active {{ item.name }}
+      register: svc_results
+      loop: "{{ required_services }}"
+      changed_when: false
+      failed_when: false
+      when: required_services | length > 0
+
+    - name: Build list of failed services
+      ansible.builtin.set_fact:
+        failed_services: >-
+          {{
+            svc_results.results
+            | selectattr('rc', 'ne', 0)
+            | map(attribute='item')
+            | list
+          }}
+      when: required_services | length > 0
+
+    - name: Set empty failed list when no services configured
+      ansible.builtin.set_fact:
+        failed_services: []
+      when: required_services | length == 0
+
+    - name: Display healthy services
+      ansible.builtin.debug:
+        msg: "OK - {{ inventory_hostname }}: {{ item.name }} ({{ item.display_name | default(item.name) }}) is active"
+      loop: "{{ required_services }}"
+      when:
+        - required_services | length > 0
+        - item.name not in (failed_services | map(attribute='name') | list)
+
+    - name: Display failed services
+      ansible.builtin.debug:
+        msg: "ALERT - {{ inventory_hostname }}: {{ item.name }} ({{ item.display_name | default(item.name) }}) is NOT running"
+      loop: "{{ failed_services }}"
+      when: failed_services | length > 0
+
+    - name: Attempt restart of failed services
+      ansible.builtin.systemd:
+        name: "{{ item.name }}"
+        state: restarted
+      loop: "{{ failed_services }}"
+      when:
+        - failed_services | length > 0
+        - item.restart_on_failure | default(false) | bool
+      register: restart_results
+      ignore_errors: true
+
+    - name: Verify services recovered after restart
+      ansible.builtin.command: systemctl is-active {{ item.name }}
+      loop: "{{ failed_services }}"
+      changed_when: false
+      failed_when: false
+      register: post_restart_check
+      when:
+        - failed_services | length > 0
+        - item.restart_on_failure | default(false) | bool
+
+    - name: Ensure alert log directory exists on controller
+      ansible.builtin.file:
+        path: "{{ service_alert_log_dir }}"
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+      run_once: true
+      when: failed_services | length > 0
+
+    - name: Write service alert report to controller
+      ansible.builtin.lineinfile:
+        path: "{{ service_alert_log_dir }}/service-report-{{ ansible_date_time.date }}.log"
+        line: >-
+          [{{ ansible_date_time.iso8601 }}] {{ inventory_hostname }}
+          FAILED services: {{ failed_services | map(attribute='name') | join(', ') }}
+        create: true
+        mode: '0644'
+      delegate_to: localhost
+      when: failed_services | length > 0
+
+    - name: Send email alert on service failure
+      community.general.mail:
+        host: localhost
+        to: "{{ service_email_to }}"
+        subject: "SERVICE ALERT: {{ inventory_hostname }} — {{ failed_services | length }} service(s) down"
+        body: |
+          Host: {{ inventory_hostname }}
+          Date: {{ ansible_date_time.iso8601 }}
+
+          Failed services:
+          {% for svc in failed_services %}
+          - {{ svc.name }} ({{ svc.display_name | default(svc.name) }})
+            restart_on_failure: {{ svc.restart_on_failure | default(false) }}
+          {% endfor %}
+      delegate_to: localhost
+      when:
+        - service_email_alert | bool
+        - failed_services | length > 0
+
+    - name: Fail play if any services are still down after restart attempts
+      ansible.builtin.fail:
+        msg: >-
+          SERVICE ALERT on {{ inventory_hostname }}:
+          {{ failed_services | map(attribute='name') | join(', ') }} is/are not running
+      when: failed_services | length > 0

@@ -1,0 +1,98 @@
+---
+- name: Disk Space Monitor
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Get disk usage (all non-virtual filesystems)
+      ansible.builtin.shell: |
+        df --output=source,target,pcent -x tmpfs -x devtmpfs -x overlay -x squashfs \
+          | tail -n +2
+      register: df_output
+      changed_when: false
+
+    - name: Find filesystems at or above ALERT threshold
+      ansible.builtin.shell: |
+        df --output=target,pcent -x tmpfs -x devtmpfs -x overlay -x squashfs \
+          | tail -n +2 \
+          | awk '{gsub(/%/,""); if ($2 >= {{ disk_alert_percent }}) print $0}'
+      register: alert_disks
+      changed_when: false
+
+    - name: Find filesystems at or above WARN threshold (below ALERT)
+      ansible.builtin.shell: |
+        df --output=target,pcent -x tmpfs -x devtmpfs -x overlay -x squashfs \
+          | tail -n +2 \
+          | awk '{gsub(/%/,""); if ($2 >= {{ disk_warn_percent }} && $2 < {{ disk_alert_percent }}) print $0}'
+      register: warn_disks
+      changed_when: false
+
+    - name: Display full disk usage
+      ansible.builtin.debug:
+        msg: "{{ df_output.stdout_lines }}"
+
+    - name: Display WARN level filesystems
+      ansible.builtin.debug:
+        msg: "WARN - {{ inventory_hostname }}: {{ item }} is above {{ disk_warn_percent }}%"
+      loop: "{{ warn_disks.stdout_lines }}"
+      when: warn_disks.stdout != ""
+
+    - name: Display ALERT level filesystems
+      ansible.builtin.debug:
+        msg: "ALERT - {{ inventory_hostname }}: {{ item }} is above {{ disk_alert_percent }}%"
+      loop: "{{ alert_disks.stdout_lines }}"
+      when: alert_disks.stdout != ""
+
+    - name: Ensure alert log directory exists on controller
+      ansible.builtin.file:
+        path: "{{ disk_alert_log_dir }}"
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+      run_once: true
+      when: alert_disks.stdout != "" or warn_disks.stdout != ""
+
+    - name: Write disk alert report to controller
+      ansible.builtin.lineinfile:
+        path: "{{ disk_alert_log_dir }}/disk-report-{{ ansible_date_time.date }}.log"
+        line: >-
+          [{{ ansible_date_time.iso8601 }}] {{ inventory_hostname }}
+          ALERT({{ alert_disks.stdout_lines | length }})
+          WARN({{ warn_disks.stdout_lines | length }}):
+          {{ alert_disks.stdout_lines | union(warn_disks.stdout_lines) | join(' | ') }}
+        create: true
+        mode: '0644'
+      delegate_to: localhost
+      when: alert_disks.stdout != "" or warn_disks.stdout != ""
+
+    - name: Send email alert on ALERT threshold breach
+      community.general.mail:
+        host: localhost
+        to: "{{ disk_email_to }}"
+        subject: "DISK ALERT: {{ inventory_hostname }} — filesystem(s) above {{ disk_alert_percent }}%"
+        body: |
+          Host: {{ inventory_hostname }}
+          Date: {{ ansible_date_time.iso8601 }}
+
+          ALERT filesystems (>= {{ disk_alert_percent }}%):
+          {{ alert_disks.stdout }}
+
+          WARN filesystems (>= {{ disk_warn_percent }}%):
+          {{ warn_disks.stdout }}
+
+          Full disk usage:
+          {{ df_output.stdout }}
+      delegate_to: localhost
+      when:
+        - disk_email_alert | bool
+        - alert_disks.stdout != ""
+
+    - name: Fail play on ALERT threshold to mark host as failed in Ansible output
+      ansible.builtin.fail:
+        msg: >-
+          DISK SPACE ALERT on {{ inventory_hostname }}:
+          {{ alert_disks.stdout_lines | join(', ') }}
+      when: alert_disks.stdout != ""

@@ -1,0 +1,27 @@
+---
+target_hosts: all
+
+# Central syslog server hostname or IP
+syslog_server: "192.168.1.100"
+syslog_port: 514
+syslog_protocol: udp    # udp or tcp (tcp is more reliable)
+
+# Log facilities and severities to forward
+# @  = UDP, @@ = TCP (set by protocol above)
+syslog_forward_rules:
+  - "*.warn"
+  - "auth,authpriv.*"
+  - "kern.*"
+  - "cron.*"
+
+# Set true on the host that will receive logs (the syslog server itself)
+syslog_configure_server: false
+
+# Directory on the server where remote logs are stored
+syslog_server_log_dir: /var/log/remote
+
+# Log retention in days (logrotate on the server)
+syslog_retention_days: 90
+
+# Open firewall ports on the syslog server
+syslog_firewall_manage: true

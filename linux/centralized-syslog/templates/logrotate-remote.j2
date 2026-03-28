@@ -1,0 +1,15 @@
+# Managed by Ansible — do not edit manually
+# Logrotate config for remote syslog files on the central syslog server
+
+{{ syslog_server_log_dir }}/*/*.log {
+    daily
+    rotate {{ syslog_retention_days }}
+    compress
+    delaycompress
+    missingok
+    notifempty
+    sharedscripts
+    postrotate
+        /usr/bin/systemctl kill -s HUP rsyslog.service 2>/dev/null || true
+    endscript
+}

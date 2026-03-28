@@ -1,0 +1,7 @@
+# Managed by Ansible — do not edit manually
+# Forward logs to central syslog server: {{ syslog_server }}:{{ syslog_port }}
+
+{% set proto_prefix = '@@' if syslog_protocol == 'tcp' else '@' %}
+{% for rule in syslog_forward_rules %}
+{{ rule }}    {{ proto_prefix }}{{ syslog_server }}:{{ syslog_port }}
+{% endfor %}

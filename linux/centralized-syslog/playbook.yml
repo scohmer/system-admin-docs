@@ -1,0 +1,107 @@
+---
+- name: Centralized Syslog Configuration
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    # ── Install rsyslog ──────────────────────────────────────────────────────
+    - name: Install rsyslog (Debian)
+      ansible.builtin.apt:
+        name: rsyslog
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install rsyslog (RedHat)
+      ansible.builtin.dnf:
+        name: rsyslog
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    # ── Configure client log forwarding ──────────────────────────────────────
+    - name: Deploy rsyslog client forwarding config
+      ansible.builtin.template:
+        src: templates/rsyslog-client.conf.j2
+        dest: /etc/rsyslog.d/50-remote-forward.conf
+        owner: root
+        group: root
+        mode: '0644'
+        validate: rsyslogd -N1 -f %s
+        backup: true
+      notify: Restart rsyslog
+
+    - name: Enable and start rsyslog
+      ansible.builtin.systemd:
+        name: rsyslog
+        enabled: true
+        state: started
+
+    # ── Configure syslog server (receiver) ───────────────────────────────────
+    - name: Create remote log directory on server
+      ansible.builtin.file:
+        path: "{{ syslog_server_log_dir }}"
+        state: directory
+        owner: syslog
+        group: adm
+        mode: '0750'
+      when: syslog_configure_server | bool
+
+    - name: Deploy rsyslog server receiver config
+      ansible.builtin.template:
+        src: templates/rsyslog-server.conf.j2
+        dest: /etc/rsyslog.d/49-server-receive.conf
+        owner: root
+        group: root
+        mode: '0644'
+        validate: rsyslogd -N1 -f %s
+        backup: true
+      when: syslog_configure_server | bool
+      notify: Restart rsyslog
+
+    - name: Deploy logrotate config for remote logs
+      ansible.builtin.template:
+        src: templates/logrotate-remote.j2
+        dest: /etc/logrotate.d/remote-syslog
+        owner: root
+        group: root
+        mode: '0644'
+      when: syslog_configure_server | bool
+
+    - name: Open syslog port in firewalld (RedHat)
+      ansible.posix.firewalld:
+        port: "{{ syslog_port }}/{{ syslog_protocol }}"
+        permanent: true
+        state: enabled
+        immediate: true
+      when:
+        - syslog_configure_server | bool
+        - ansible_os_family == "RedHat"
+        - syslog_firewall_manage | bool
+
+    - name: Open syslog port in UFW (Debian)
+      community.general.ufw:
+        rule: allow
+        port: "{{ syslog_port }}"
+        proto: "{{ syslog_protocol }}"
+      when:
+        - syslog_configure_server | bool
+        - ansible_os_family == "Debian"
+        - syslog_firewall_manage | bool
+
+    - name: Verify rsyslog is running
+      ansible.builtin.command: systemctl is-active rsyslog
+      changed_when: false
+      register: rsyslog_status
+
+    - name: Display rsyslog status
+      ansible.builtin.debug:
+        msg: "rsyslog on {{ inventory_hostname }}: {{ rsyslog_status.stdout }}"
+
+  handlers:
+    - name: Restart rsyslog
+      ansible.builtin.systemd:
+        name: rsyslog
+        state: restarted

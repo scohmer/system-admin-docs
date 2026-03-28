@@ -1,0 +1,17 @@
+# Managed by Ansible — do not edit manually
+# Rsyslog receiver configuration — accepts remote logs on port {{ syslog_port }}/{{ syslog_protocol }}
+
+{% if syslog_protocol == 'tcp' %}
+module(load="imtcp")
+input(type="imtcp" port="{{ syslog_port }}")
+{% else %}
+module(load="imudp")
+input(type="imudp" port="{{ syslog_port }}")
+{% endif %}
+
+# Store remote logs in per-host subdirectories
+$template RemoteLogs,"{{ syslog_server_log_dir }}/%HOSTNAME%/%PROGRAMNAME%.log"
+if $fromhost-ip != '127.0.0.1' then {
+    *.* ?RemoteLogs
+    stop
+}

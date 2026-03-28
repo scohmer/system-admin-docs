@@ -72,13 +72,16 @@ This directory contains PowerShell scripts for common Windows system administrat
 | [NTFS Permissions](ntfs-permissions/) | `Set-NTFSPermissions.ps1` | Add, remove, and replace NTFS ACLs on files and folders |
 | [File Share Management](file-share-management/) | `Manage-FileShares.ps1` | Create, modify, and remove SMB file shares |
 
-### Monitoring & Diagnostics
+### Monitoring, Alerting & Diagnostics
 
 | Task | Script | Description |
 |------|--------|-------------|
 | [Event Log Query](event-log-query/) | `Get-EventLogEntries.ps1` | Search and export Windows Event Log entries with filters |
 | [Event Log Management](event-log-management/) | `Manage-EventLogs.ps1` | Clear, resize, back up, and create Windows Event Logs |
 | [Performance Monitoring](performance-monitoring/) | `Get-PerformanceMetrics.ps1` | Collect CPU, memory, disk, and network performance metrics |
+| [Disk Space Alerting](disk-space-alert/) | `Get-DiskSpaceAlert.ps1` | Alert when drive usage exceeds warn/alert thresholds; logs to network share |
+| [Service Health Monitor](service-health-monitor/) | `Get-ServiceHealth.ps1` | Alert on stopped auto-start services; optional auto-restart |
+| [Certificate Expiry Monitor](certificate-expiry-monitor/) | `Get-CertificateExpiry.ps1` | Alert on certificates approaching expiry in any cert store |
 | [Process Management](process-management/) | `Manage-Processes.ps1` | List, filter, kill, and diagnose Windows processes |
 | [System Information](system-info/) | `Get-SystemInfo.ps1` | Collect hardware, OS, software, and network information |
 | [Memory Diagnostics](memory-diagnostics/) | `Invoke-MemoryDiagnostic.ps1` | Schedule Windows Memory Diagnostic and retrieve results |
@@ -95,6 +98,12 @@ This directory contains PowerShell scripts for common Windows system administrat
 | [Hosts File](hosts-file/) | `Manage-HostsFile.ps1` | Add, remove, and list entries in the Windows hosts file |
 | [Power Management](power-management/) | `Set-PowerManagement.ps1` | Configure power plans, sleep timeouts, and shutdown policies |
 | [Printer Management](printer-management/) | `Manage-Printers.ps1` | Install, list, remove printers, and manage print queues |
+
+### Shared Modules
+
+| Module | File | Description |
+|--------|------|-------------|
+| [Logging Module](shared/) | `Write-Log.ps1` | Shared logging to console, local file, network share, and alert log |
 
 ## Adding a New Task
 

@@ -28,13 +28,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Write-Status {
-    param([string]$Message, [string]$Level = 'INFO')
-    $color = switch ($Level) {
-        'SUCCESS' { 'Green' }; 'WARN' { 'Yellow' }; 'ERROR' { 'Red' }; default { 'Cyan' }
-    }
-    Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')][$Level] $Message" -ForegroundColor $color
-}
+. "$PSScriptRoot\..\shared\Write-Log.ps1"
+Initialize-Log -ScriptName 'Manage-Services'
 
 function Assert-ServiceName {
     if (-not $ServiceName) { throw "Parameter -ServiceName is required for action '$Action'." }
@@ -105,7 +100,7 @@ switch ($Action) {
     }
 
     'List' {
-        Write-Status "Listing services$(if ($StatusFilter) { " with status: $StatusFilter" } else { '' })..."
+        Write-Log "Listing services$(if ($StatusFilter) { " with status: $StatusFilter" } else { '' })..."
         $services = Get-Service
         if ($StatusFilter) {
             $services = $services | Where-Object { $_.Status -eq $StatusFilter }
@@ -114,3 +109,5 @@ switch ($Action) {
             Sort-Object DisplayName | Format-Table -AutoSize
     }
 }
+
+Close-Log

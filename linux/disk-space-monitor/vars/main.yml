@@ -1,0 +1,19 @@
+---
+target_hosts: all
+
+disk_warn_percent: 80
+disk_alert_percent: 90
+
+# Directory on the Ansible controller for alert reports
+disk_alert_log_dir: /var/log/ansible/disk-alerts
+
+# Email alert settings (requires mailutils on the controller)
+disk_email_alert: false
+disk_email_to: "ops@example.com"
+
+# Mount point types to exclude from checks
+disk_exclude_types:
+  - tmpfs
+  - devtmpfs
+  - overlay
+  - squashfs

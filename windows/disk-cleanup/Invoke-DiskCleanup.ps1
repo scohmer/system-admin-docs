@@ -20,11 +20,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Continue'  # Keep going if individual file deletions fail
 
-function Write-Status {
-    param([string]$Message, [string]$Level = 'INFO')
-    $color = switch ($Level) { 'SUCCESS' { 'Green' }; 'WARN' { 'Yellow' }; 'ERROR' { 'Red' }; default { 'Cyan' } }
-    Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')][$Level] $Message" -ForegroundColor $color
-}
+. "$PSScriptRoot\..\shared\Write-Log.ps1"
+Initialize-Log -ScriptName 'Invoke-DiskCleanup'
 
 function Get-FriendlySize {
     param([long]$Bytes)
@@ -134,6 +131,8 @@ switch ($Action) {
 if ($Action -ne 'Report') {
     $freeAfter = Get-DiskFreeSpace
     $totalFreed = [math]::Max(0, $freeAfter - $freeBefore)
-    Write-Status "Total additional free space on ${Drive}: $(Get-FriendlySize $totalFreed)" 'SUCCESS'
+    Write-Log "Total additional free space on ${Drive}: $(Get-FriendlySize $totalFreed)" 'SUCCESS'
     Invoke-Report
 }
+
+Close-Log

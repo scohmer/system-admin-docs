@@ -1,0 +1,21 @@
+---
+target_hosts: all
+
+# Services that MUST be running — play fails for any host where a service is down
+required_services: []
+  # - name: nginx
+  #   display_name: "Nginx Web Server"
+  #   restart_on_failure: true
+  # - name: sshd
+  #   display_name: "SSH Daemon"
+  #   restart_on_failure: false
+  # - name: postgresql
+  #   display_name: "PostgreSQL Database"
+  #   restart_on_failure: true
+
+# Alert log directory on the Ansible controller
+service_alert_log_dir: /var/log/ansible/service-alerts
+
+# Email alerts on failure
+service_email_alert: false
+service_email_to: "ops@example.com"
