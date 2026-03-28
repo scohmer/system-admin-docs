@@ -18,11 +18,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Write-Status {
-    param([string]$Message, [string]$Level = 'INFO')
-    $color = switch ($Level) { 'SUCCESS' { 'Green' }; 'WARN' { 'Yellow' }; 'ERROR' { 'Red' }; default { 'Cyan' } }
-    Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')][$Level] $Message" -ForegroundColor $color
-}
+. "$PSScriptRoot\..\shared\Write-Log.ps1"
+Initialize-Log -ScriptName 'Invoke-MemoryDiagnostic'
 
 switch ($Action) {
 
@@ -99,3 +96,4 @@ switch ($Action) {
         Write-Host "  Free Virtual Memory:  $([math]::Round($os.FreeVirtualMemory/1MB,1)) GB"
     }
 }
+Close-Log

@@ -22,11 +22,8 @@ $ErrorActionPreference = 'Stop'
 $wuRegPath   = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate'
 $wuAuRegPath = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU'
 
-function Write-Status {
-    param([string]$Message, [string]$Level = 'INFO')
-    $color = switch ($Level) { 'SUCCESS' { 'Green' }; 'WARN' { 'Yellow' }; 'ERROR' { 'Red' }; default { 'Cyan' } }
-    Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')][$Level] $Message" -ForegroundColor $color
-}
+. "$PSScriptRoot\..\shared\Write-Log.ps1"
+Initialize-Log -ScriptName 'Set-WSUSClient'
 
 function Ensure-RegPath { param([string]$Path) if (-not (Test-Path $Path)) { New-Item -Path $Path -Force | Out-Null } }
 
@@ -116,3 +113,4 @@ switch ($Action) {
         }
     }
 }
+Close-Log

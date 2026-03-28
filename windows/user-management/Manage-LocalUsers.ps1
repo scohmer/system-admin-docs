@@ -34,18 +34,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Write-Status {
-    param([string]$Message, [string]$Level = 'INFO')
-    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    $color = switch ($Level) {
-        'INFO'    { 'Cyan' }
-        'SUCCESS' { 'Green' }
-        'WARN'    { 'Yellow' }
-        'ERROR'   { 'Red' }
-        default   { 'White' }
-    }
-    Write-Host "[$timestamp][$Level] $Message" -ForegroundColor $color
-}
+. "$PSScriptRoot\..\shared\Write-Log.ps1"
+Initialize-Log -ScriptName 'Manage-LocalUsers'
 
 function Assert-Username {
     if (-not $Username) {
@@ -142,3 +132,4 @@ switch ($Action) {
             Format-Table -AutoSize
     }
 }
+Close-Log

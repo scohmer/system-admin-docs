@@ -54,11 +54,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-function Write-Status {
-    param([string]$Message, [string]$Level = 'INFO')
-    $color = switch ($Level) { 'SUCCESS' { 'Green' }; 'WARN' { 'Yellow' }; 'ERROR' { 'Red' }; default { 'Cyan' } }
-    Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')][$Level] $Message" -ForegroundColor $color
-}
+. "$PSScriptRoot\..\shared\Write-Log.ps1"
+Initialize-Log -ScriptName 'Set-ProxyConfiguration'
 
 # Registry path for WinINET/IE proxy settings (current user)
 $regPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
@@ -216,3 +213,4 @@ switch ($Action) {
         }
     }
 }
+Close-Log

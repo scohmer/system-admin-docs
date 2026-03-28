@@ -38,11 +38,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Write-Status {
-    param([string]$Message, [string]$Level = 'INFO')
-    $color = switch ($Level) { 'SUCCESS' { 'Green' }; 'WARN' { 'Yellow' }; 'ERROR' { 'Red' }; default { 'Cyan' } }
-    Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')][$Level] $Message" -ForegroundColor $color
-}
+. "$PSScriptRoot\..\shared\Write-Log.ps1"
+Initialize-Log -ScriptName 'Get-EventLogEntries'
 
 # Map level names to Get-WinEvent level values
 $levelMap = @{
@@ -117,3 +114,4 @@ if ($ExportCsv) {
         Export-Csv -Path $ExportCsv -NoTypeInformation -Encoding UTF8
     Write-Status "Exported to: $ExportCsv" 'SUCCESS'
 }
+Close-Log

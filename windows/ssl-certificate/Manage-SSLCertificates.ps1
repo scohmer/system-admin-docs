@@ -24,11 +24,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Write-Status {
-    param([string]$Message, [string]$Level = 'INFO')
-    $color = switch ($Level) { 'SUCCESS' { 'Green' }; 'WARN' { 'Yellow' }; 'ERROR' { 'Red' }; default { 'Cyan' } }
-    Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')][$Level] $Message" -ForegroundColor $color
-}
+. "$PSScriptRoot\..\shared\Write-Log.ps1"
+Initialize-Log -ScriptName 'Manage-SSLCertificates'
 
 $storePath = "Cert:\$StoreLocation\$StoreName"
 
@@ -121,3 +118,4 @@ switch ($Action) {
         }
     }
 }
+Close-Log

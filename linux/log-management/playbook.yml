@@ -20,6 +20,15 @@
         name: rsyslog
         state: restarted
 
+  pre_tasks:
+    - name: Log playbook run start to controller
+      ansible.builtin.lineinfile:
+        path: "{{ playbook_log_dir | default('/var/log/ansible/playbook-runs') }}/{{ ansible_play_name | lower | replace(' ', '-') }}.log"
+        line: "[{{ ansible_date_time.iso8601 }}] STARTED on {{ inventory_hostname }} by {{ lookup('env', 'USER') | default('ansible', true) }}"
+        create: true
+        mode: '0644'
+      delegate_to: localhost
+
   tasks:
 
     # ------------------------------------------------------------------

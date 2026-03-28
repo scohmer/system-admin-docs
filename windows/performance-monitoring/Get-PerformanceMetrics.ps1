@@ -21,11 +21,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Write-Status {
-    param([string]$Message, [string]$Level = 'INFO')
-    $color = switch ($Level) { 'SUCCESS' { 'Green' }; 'WARN' { 'Yellow' }; 'ERROR' { 'Red' }; default { 'Cyan' } }
-    Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')][$Level] $Message" -ForegroundColor $color
-}
+. "$PSScriptRoot\..\shared\Write-Log.ps1"
+Initialize-Log -ScriptName 'Get-PerformanceMetrics'
 
 function Get-FriendlySize {
     param([long]$Bytes)
@@ -128,3 +125,4 @@ if ($ExportCsv -and $results.Count -gt 0) {
     $results | Export-Csv -Path $ExportCsv -NoTypeInformation -Encoding UTF8
     Write-Status "Metrics exported to: $ExportCsv" 'SUCCESS'
 }
+Close-Log

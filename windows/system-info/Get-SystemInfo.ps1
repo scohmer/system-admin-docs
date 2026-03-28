@@ -18,6 +18,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+. "$PSScriptRoot\..\shared\Write-Log.ps1"
+Initialize-Log -ScriptName 'Get-SystemInfo'
+
 $cimParams = @{}
 if ($ComputerName -ne $env:COMPUTERNAME) { $cimParams['ComputerName'] = $ComputerName }
 
@@ -139,3 +142,4 @@ if ($ExportPath) {
     $output.ToString() | Set-Content -Path $ExportPath -Encoding UTF8
     Write-Host "`n[SUCCESS] Report saved to: $ExportPath" -ForegroundColor Green
 }
+Close-Log

@@ -47,11 +47,8 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # ─── Helper: coloured timestamped output ────────────────────────────────────
-function Write-Status {
-    param([string]$Message, [string]$Level = 'INFO')
-    $color = switch ($Level) { 'SUCCESS' { 'Green' }; 'WARN' { 'Yellow' }; 'ERROR' { 'Red' }; default { 'Cyan' } }
-    Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')][$Level] $Message" -ForegroundColor $color
-}
+. "$PSScriptRoot\..\shared\Write-Log.ps1"
+Initialize-Log -ScriptName 'Manage-Registry'
 
 function Assert-Param {
     param([string]$Value, [string]$ParamName)
@@ -190,3 +187,4 @@ switch ($Action) {
         }
     }
 }
+Close-Log

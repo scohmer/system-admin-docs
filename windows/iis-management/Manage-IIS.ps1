@@ -24,11 +24,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Write-Status {
-    param([string]$Message, [string]$Level = 'INFO')
-    $color = switch ($Level) { 'SUCCESS' { 'Green' }; 'WARN' { 'Yellow' }; 'ERROR' { 'Red' }; default { 'Cyan' } }
-    Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')][$Level] $Message" -ForegroundColor $color
-}
+. "$PSScriptRoot\..\shared\Write-Log.ps1"
+Initialize-Log -ScriptName 'Manage-IIS'
 
 if (-not (Get-Module -ListAvailable WebAdministration)) {
     throw "WebAdministration module not found. Install IIS with: Install-WindowsFeature -Name Web-Server -IncludeManagementTools"
@@ -134,3 +131,4 @@ switch ($Action) {
         }
     }
 }
+Close-Log
